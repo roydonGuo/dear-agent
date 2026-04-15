@@ -6,6 +6,8 @@ server:
       force: true
       enabled: true
 spring:
+  profiles:
+    active: dev
   ai:
     openai:
       api-key: @dashscope.api.key@
