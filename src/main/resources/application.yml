@@ -10,11 +10,11 @@ spring:
 #    active: dev
   ai:
     openai:
-      api-key: @deepseek.api.key@
-      base-url: https://api.deepseek.com
+      api-key: @dashscope.api.key@
+      base-url: https://dashscope.aliyuncs.com/compatible-mode/
       chat:
         options:
-          model: deepseek-v4-flash
+          model: glm-5
           temperature: 0.7
           maxTokens: 50000
       embedding:
