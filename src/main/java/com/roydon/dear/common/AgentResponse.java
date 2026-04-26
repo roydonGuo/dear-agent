@@ -18,6 +18,7 @@ public class AgentResponse {
     public static final String TYPE_ERROR = "error";
     public static final String TYPE_RECOMMEND = "recommend";
     public static final String TYPE_EXPRESSION = "expression"; // 表情
+    public static final String TYPE_DONE = "done"; // 完成标识
 
     private String type;
     private String content;
@@ -102,6 +103,10 @@ public class AgentResponse {
      */
     public static String recommend(String content, Integer count) {
         return new AgentResponse(TYPE_RECOMMEND, content, count).toJson();
+    }
+
+    public static String done(String content) {
+        return new AgentResponse(TYPE_DONE, content).toJson();
     }
 
     /**

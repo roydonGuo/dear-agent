@@ -1,7 +1,7 @@
 package com.roydon.dear.controller;
 
 import com.roydon.dear.agent.DearAgent;
-import com.roydon.dear.agent.WebSearchReactAgent;
+import com.roydon.dear.domain.entity.AiSession;
 import com.roydon.dear.manager.AgentTaskManager;
 import com.roydon.dear.service.AiSessionService;
 import io.modelcontextprotocol.client.McpClient;
@@ -10,6 +10,9 @@ import io.modelcontextprotocol.client.transport.HttpClientStreamableHttpTranspor
 import io.swagger.v3.oas.annotations.Operation;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.chat.memory.MessageWindowChatMemory;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.mcp.SyncMcpToolCallbackProvider;
 import org.springframework.ai.tool.ToolCallback;
@@ -70,7 +73,8 @@ public class AgentController implements InitializingBean {
                                         @RequestParam(required = false) Boolean think) {
         // todo conversationId如果为空则创建session对话，返回给前端conversationId
 
-        log.info("收到请求: query={}, conversationId={}", query, conversationId);
+        boolean thinkEnabled = Boolean.TRUE.equals(think);
+        log.info("收到请求: query={}, conversationId={}, think={}", query, conversationId, thinkEnabled);
 
         if (query == null || query.trim().isEmpty()) {
             log.warn("参数为空或无效");
@@ -78,11 +82,10 @@ public class AgentController implements InitializingBean {
         }
 
         try {
-            DearAgent dearAgent = initDearAgent();
             // 使用持久化记忆加载历史记录
-            ChatMemory persistentMemory = dearAgent.createPersistentChatMemory(conversationId, 30);
-            dearAgent.setChatMemory(persistentMemory);
-            return dearAgent.stream(conversationId, query);
+            ChatMemory persistentMemory = createPersistentChatMemory(conversationId, 30);
+            DearAgent dearAgent = initDearAgent(persistentMemory);
+            return dearAgent.stream(conversationId, query, thinkEnabled);
         } catch (Exception e) {
             log.error("处理网页搜索请求时发生错误: ", e);
             return Flux.error(e);
@@ -167,19 +170,43 @@ public class AgentController implements InitializingBean {
     }
 
     /**
-     * 初始化网页搜索 Agent
+     * 初始化 Agent
      */
-    private DearAgent initDearAgent() {
+    private DearAgent initDearAgent(ChatMemory chatMemory) {
         log.info("初始化 Agent...");
 
         return DearAgent.builder()
                 .name("dear react")
                 .chatModel(chatModel)
                 .tools(webSearchToolCallbacks)
+                .chatMemory(chatMemory)
                 .sessionService(sessionService)
                 .taskManager(taskManager)
                 .maxRounds(5)
                 .build();
+    }
+
+    /**
+     * 从数据库加载历史记录创建持久化ChatMemory
+     */
+    private ChatMemory createPersistentChatMemory(String sessionId, int maxMessages) {
+        // 查询数据库中的对话历史
+        List<AiSession> history = sessionService.findRecentBySessionId(sessionId, maxMessages);
+        ChatMemory chatMemory = MessageWindowChatMemory.builder().maxMessages(maxMessages).build();
+
+        // 按时间顺序加载历史记录
+        if (history != null && !history.isEmpty()) {
+            for (int i = history.size() - 1; i >= 0; i--) {
+                AiSession record = history.get(i);
+                if (record.getQuestion() != null) {
+                    chatMemory.add(sessionId, new UserMessage(record.getQuestion()));
+                }
+                if (record.getAnswer() != null) {
+                    chatMemory.add(sessionId, new AssistantMessage(record.getAnswer()));
+                }
+            }
+        }
+        return chatMemory;
     }
 
     /**

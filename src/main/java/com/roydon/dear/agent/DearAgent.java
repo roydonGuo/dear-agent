@@ -91,24 +91,31 @@ public class DearAgent extends BaseAgent {
 
     @Override
     public Flux<String> execute(String conversationId, String question) {
-        return streamInternal(conversationId, question);
+        return streamInternal(conversationId, question, true);
     }
 
     /**
      * 流式输出
      */
     public Flux<String> stream(String question) {
-        return streamInternal(null, question);
+        return streamInternal(null, question, true);
     }
 
     /**
      * 带会话记忆的流式输出
      */
     public Flux<String> stream(String conversationId, String question) {
-        return streamInternal(conversationId, question);
+        return streamInternal(conversationId, question, true);
     }
 
-    private Flux<String> streamInternal(String conversationId, String question) {
+    /**
+     * 带思考模式控制的流式输出
+     */
+    public Flux<String> stream(String conversationId, String question, boolean enableThinking) {
+        return streamInternal(conversationId, question, enableThinking);
+    }
+
+    private Flux<String> streamInternal(String conversationId, String question, boolean enableThinking) {
         List<Message> messages = Collections.synchronizedList(new ArrayList<>());
         boolean useMemory = conversationId != null && chatMemory != null;
 
@@ -130,6 +137,7 @@ public class DearAgent extends BaseAgent {
             return Flux.error(new IllegalStateException("该会话正在执行中，请稍后再试"));
         }
 
+        // todo 加载agent设定
         // ===== 加载 System Prompt（始终放在最开始）=====
         messages.add(new SystemMessage(ReactAgentPrompts.getDearAgentPrompt()));
         if (StringUtils.isNotBlank(systemPrompt)) {
@@ -169,19 +177,17 @@ public class DearAgent extends BaseAgent {
 
         AgentState agentState = new AgentState();
 
-        scheduleRound(messages, sink, roundCounter, hasSentFinalResult, finalAnswerBuffer, useMemory, conversationId, agentState, thinkingBuffer);
+        scheduleRound(messages, sink, roundCounter, hasSentFinalResult, finalAnswerBuffer, useMemory, conversationId, agentState, thinkingBuffer, enableThinking);
 
         return sink.asFlux()
                 .doOnNext(chunk -> {
                     recordFirstResponse();
-                    // 解析 JSON，如果是 type=text，则只拼接 content；如果是 type=thinking，则拼接 thinking
+                    // 解析 JSON，仅拼接 text，thinking 在产生时已直接写入 thinkingBuffer
                     try {
                         JSONObject json = JSON.parseObject(chunk);
                         String type = json.getString("type");
                         if ("text".equals(type)) {
                             finalAnswerBuffer.append(json.getString("content"));
-                        } else if ("thinking".equals(type)) {
-                            thinkingBuffer.append(json.getString("content"));
                         }
                     } catch (Exception e) {
                         // 解析失败，直接拼接
@@ -235,7 +241,8 @@ public class DearAgent extends BaseAgent {
     }
 
     private void scheduleRound(List<Message> messages, Sinks.Many<String> sink, AtomicLong roundCounter, AtomicBoolean hasSentFinalResult,
-                               StringBuilder finalAnswerBuffer, boolean useMemory, String conversationId, AgentState agentState, StringBuilder thinkingBuffer) {
+                               StringBuilder finalAnswerBuffer, boolean useMemory, String conversationId, AgentState agentState,
+                               StringBuilder thinkingBuffer, boolean enableThinking) {
         // 轮次+1
         roundCounter.incrementAndGet();
         RoundState state = new RoundState();
@@ -245,8 +252,8 @@ public class DearAgent extends BaseAgent {
                 .stream()
                 .chatResponse()
                 .publishOn(Schedulers.boundedElastic())
-                .doOnNext(chunk -> processChunk(chunk, sink, state))
-                .doOnComplete(() -> finishRound(messages, sink, state, roundCounter, hasSentFinalResult, finalAnswerBuffer, useMemory, conversationId, agentState, thinkingBuffer))
+                .doOnNext(chunk -> processChunk(chunk, sink, state, thinkingBuffer, enableThinking))
+                .doOnComplete(() -> finishRound(messages, sink, state, roundCounter, hasSentFinalResult, finalAnswerBuffer, useMemory, conversationId, agentState, thinkingBuffer, enableThinking))
                 .doOnError(err -> {
                     if (!hasSentFinalResult.get()) {
                         hasSentFinalResult.set(true);
@@ -261,15 +268,24 @@ public class DearAgent extends BaseAgent {
         }
     }
 
-    private void processChunk(ChatResponse chunk, Sinks.Many<String> sink, RoundState state) {
-        if (chunk == null || chunk.getResult() == null ||
-                chunk.getResult().getOutput() == null) {
+    private void processChunk(ChatResponse chunk, Sinks.Many<String> sink, RoundState state, StringBuilder thinkingBuffer, boolean enableThinking) {
+        if (chunk == null || chunk.getResult() == null || chunk.getResult().getOutput() == null) {
             return;
         }
 
         Generation gen = chunk.getResult();
         String text = gen.getOutput().getText();
         List<AssistantMessage.ToolCall> tc = gen.getOutput().getToolCalls();
+        // 处理思考阶段
+        if (enableThinking && text == null) {
+            String thinkingText = extractThinkingText(gen);
+            if (StringUtils.isNotBlank(thinkingText)) {
+                thinkingBuffer.append(thinkingText);
+                if (enableThinking) {
+                    sink.tryEmitNext(createThinkingResponse(thinkingText));
+                }
+            }
+        }
 
         // 一旦发现 tool_call，立即进入 TOOL_CALL 模式
         if (tc != null && !tc.isEmpty()) {
@@ -311,7 +327,8 @@ public class DearAgent extends BaseAgent {
      */
     private void finishRound(List<Message> messages, Sinks.Many<String> sink, RoundState state,
                              AtomicLong roundCounter, AtomicBoolean hasSentFinalResult, StringBuilder finalAnswerBuffer,
-                             boolean useMemory, String conversationId, AgentState agentState, StringBuilder thinkingBuffer) {
+                             boolean useMemory, String conversationId, AgentState agentState, StringBuilder thinkingBuffer,
+                             boolean enableThinking) {
 
         // 如果整轮都没有 tool_call，才是最终答案
         if (state.getMode() != RoundMode.TOOL_CALL) {
@@ -336,6 +353,9 @@ public class DearAgent extends BaseAgent {
                 }
             }
 
+            // 输出done标记
+            sink.tryEmitNext(createDoneResponse(conversationId));
+
             sink.tryEmitComplete();
             hasSentFinalResult.set(true);
             return;
@@ -346,21 +366,20 @@ public class DearAgent extends BaseAgent {
         messages.add(assistantMsg);
 
         if (maxRounds > 0 && roundCounter.get() >= maxRounds) {
-            forceFinalStream(messages, sink, hasSentFinalResult, state, conversationId, useMemory, agentState, thinkingBuffer);
+            forceFinalStream(messages, sink, hasSentFinalResult, state, conversationId, useMemory, agentState, thinkingBuffer, enableThinking);
             return;
         }
 
-        executeToolCalls(sink, state.toolCalls, messages, hasSentFinalResult, state, agentState, () -> {
+        executeToolCalls(sink, state.toolCalls, messages, hasSentFinalResult, state, agentState, thinkingBuffer, enableThinking, () -> {
             if (!hasSentFinalResult.get()) {
-                scheduleRound(messages, sink, roundCounter,
-                        hasSentFinalResult, finalAnswerBuffer,
-                        useMemory, conversationId, agentState, thinkingBuffer);
+                scheduleRound(messages, sink, roundCounter, hasSentFinalResult, finalAnswerBuffer, useMemory, conversationId, agentState, thinkingBuffer, enableThinking);
             }
         });
     }
 
     private void forceFinalStream(List<Message> messages, Sinks.Many<String> sink, AtomicBoolean hasSentFinalResult, RoundState state,
-                                  String conversationId, boolean useMemory, AgentState agentState, StringBuilder thinkingBuffer) {
+                                  String conversationId, boolean useMemory, AgentState agentState, StringBuilder thinkingBuffer,
+                                  boolean enableThinking) {
         // 创建新的消息列表，确保系统提示词在最前面
         List<Message> newMessages = new ArrayList<>();
 
@@ -433,6 +452,9 @@ public class DearAgent extends BaseAgent {
                         }
                     }
 
+                    // 输出done标记
+                    sink.tryEmitNext(createDoneResponse(conversationId));
+
                     hasSentFinalResult.set(true);
                     sink.tryEmitComplete();
                 })
@@ -448,7 +470,9 @@ public class DearAgent extends BaseAgent {
         }
     }
 
-    private void executeToolCalls(Sinks.Many<String> sink, List<AssistantMessage.ToolCall> toolCalls, List<Message> messages, AtomicBoolean hasSentFinalResult, RoundState state, AgentState agentState, Runnable onComplete) {
+    private void executeToolCalls(Sinks.Many<String> sink, List<AssistantMessage.ToolCall> toolCalls, List<Message> messages,
+                                  AtomicBoolean hasSentFinalResult, RoundState state, AgentState agentState,
+                                  StringBuilder thinkingBuffer, boolean enableThinking, Runnable onComplete) {
         AtomicInteger completedCount = new AtomicInteger(0);
         int totalToolCalls = toolCalls.size();
 
@@ -478,7 +502,10 @@ public class DearAgent extends BaseAgent {
                     String query = (String) args.get("query");
                     // 发送 thinking 消息，表示正在搜索相关信息
                     String queryThink = StringUtils.isNotBlank(query) ? "🔍 正在搜索信息: " + query + "\n" : "🔍 正在搜索相关信息\n";
-                    sink.tryEmitNext(createThinkingResponse(queryThink));
+                    thinkingBuffer.append(queryThink);
+                    if (enableThinking) {
+                        sink.tryEmitNext(createThinkingResponse(queryThink));
+                    }
                 }
 
                 try {
@@ -600,6 +627,71 @@ public class DearAgent extends BaseAgent {
                 .filter(t -> t.getToolDefinition().name().equals(name))
                 .findFirst()
                 .orElse(null);
+    }
+
+    /**
+     * 尽量兼容不同模型返回的思考字段，避免遗漏 reasoning 内容
+     */
+    private String extractThinkingText(Generation gen) {
+        String thinking = extractThinkingFromMetadata(gen.getOutput().getMetadata());
+        if (StringUtils.isNotBlank(thinking)) {
+            return thinking;
+        }
+        return null;
+    }
+
+    private String extractThinkingFromMetadata(Map<String, Object> metadata) {
+        if (metadata == null) {
+            return null;
+        }
+        try {
+            return firstNonBlankThinking(metadata);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private String firstNonBlankThinking(Map<String, Object> metadata) {
+        String thinking = null;
+        for (String key : List.of("reasoningContent", "reasoning", "thinking", "thought", "reasoning_content")) {
+            thinking = extractString(metadata.get(key));
+            if (StringUtils.isNotBlank(thinking)) {
+                return thinking;
+            }
+        }
+        return null;
+    }
+
+    private String extractString(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof String str) {
+            return str;
+        }
+        if (value instanceof Collection<?> collection) {
+            StringBuilder sb = new StringBuilder();
+            for (Object item : collection) {
+                String text = extractString(item);
+                if (StringUtils.isNotBlank(text)) {
+                    if (sb.length() > 0) {
+                        sb.append('\n');
+                    }
+                    sb.append(text);
+                }
+            }
+            return sb.toString();
+        }
+        if (value instanceof Map<?, ?> map) {
+            for (String key : List.of("text", "content", "value")) {
+                String text = extractString(map.get(key));
+                if (StringUtils.isNotBlank(text)) {
+                    return text;
+                }
+            }
+            return null;
+        }
+        return Objects.toString(value, null);
     }
 
     public void setMaxRounds(int maxRounds) {

@@ -209,6 +209,10 @@ public abstract class BaseAgent {
         return AgentResponse.recommend(content);
     }
 
+    protected String createDoneResponse(String content) {
+        return AgentResponse.done(content);
+    }
+
     /**
      * 记录首次响应时间
      */
