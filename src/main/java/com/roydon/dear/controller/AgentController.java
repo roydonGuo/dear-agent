@@ -9,6 +9,7 @@ import io.modelcontextprotocol.client.McpSyncClient;
 import io.modelcontextprotocol.client.transport.HttpClientStreamableHttpTransport;
 import io.swagger.v3.oas.annotations.Operation;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -70,7 +71,8 @@ public class AgentController implements InitializingBean {
     @Operation(summary = "智能问答", description = "接收用户查询并返回流式响应，使用联网搜索获取信息")
     public Flux<String> webSearchStream(@RequestParam(required = true) String query,
                                         @RequestParam(required = true) String conversationId,
-                                        @RequestParam(required = false) Boolean think) {
+                                        @RequestParam(required = false) Boolean think,
+                                        @RequestParam(required = false) Boolean webSearch) {
         // todo conversationId如果为空则创建session对话，返回给前端conversationId
 
         boolean thinkEnabled = Boolean.TRUE.equals(think);
@@ -83,8 +85,7 @@ public class AgentController implements InitializingBean {
 
         try {
             // 使用持久化记忆加载历史记录
-            ChatMemory persistentMemory = createPersistentChatMemory(conversationId, 30);
-            DearAgent dearAgent = initDearAgent(persistentMemory);
+            DearAgent dearAgent = initDearAgent(conversationId);
             return dearAgent.stream(conversationId, query, thinkEnabled);
         } catch (Exception e) {
             log.error("处理网页搜索请求时发生错误: ", e);
@@ -123,6 +124,7 @@ public class AgentController implements InitializingBean {
         boolean success = taskManager.stopTask(conversationId);
 
         Map<String, Object> result = new HashMap<>();
+        result.put("code", 200);
         if (success) {
             result.put("success", true);
             result.put("message", "已停止执行");
@@ -172,18 +174,22 @@ public class AgentController implements InitializingBean {
     /**
      * 初始化 Agent
      */
-    private DearAgent initDearAgent(ChatMemory chatMemory) {
+    private DearAgent initDearAgent(String conversationId) {
         log.info("初始化 Agent...");
-
-        return DearAgent.builder()
+        DearAgent dearReact = DearAgent.builder()
                 .name("dear react")
                 .chatModel(chatModel)
                 .tools(webSearchToolCallbacks)
-                .chatMemory(chatMemory)
                 .sessionService(sessionService)
                 .taskManager(taskManager)
                 .maxRounds(5)
                 .build();
+
+        if (StringUtils.isNotBlank(conversationId)) {
+            ChatMemory chatMemory = createPersistentChatMemory(conversationId, 30);
+            dearReact.setChatMemory(chatMemory);
+        }
+        return dearReact;
     }
 
     /**

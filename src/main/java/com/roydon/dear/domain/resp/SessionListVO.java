@@ -51,6 +51,11 @@ public class SessionListVO {
     private String fileid;
 
     /**
+     * 思考过程
+     */
+    private String thinking;
+
+    /**
      * 从AiSession构建
      */
     public static SessionListVO fromAiSession(AiSession session, Integer messageCount) {
@@ -63,6 +68,7 @@ public class SessionListVO {
                 .createTime(session.getCreateTime())
                 .updateTime(session.getUpdateTime())
                 .fileid(session.getFileid())
+                .thinking(session.getThinking())
                 .build();
     }
 }

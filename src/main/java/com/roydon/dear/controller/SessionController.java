@@ -104,7 +104,6 @@ public class SessionController {
                     .build();
 
             return BaseResult.newSuccess(pageResult);
-
         } catch (Exception e) {
             log.error("查询会话列表失败", e);
             return BaseResult.newError("查询会话列表失败: " + e.getMessage());

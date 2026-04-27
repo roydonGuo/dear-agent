@@ -118,6 +118,9 @@ public class DearAgent extends BaseAgent {
     private Flux<String> streamInternal(String conversationId, String question, boolean enableThinking) {
         List<Message> messages = Collections.synchronizedList(new ArrayList<>());
         boolean useMemory = conversationId != null && chatMemory != null;
+        if(StringUtils.isBlank(conversationId)){
+            conversationId = UUID.randomUUID().toString();
+        }
 
         // 检查是否已有任务在执行
         Flux<String> checkResult = checkRunningTask(conversationId);
@@ -179,6 +182,8 @@ public class DearAgent extends BaseAgent {
 
         scheduleRound(messages, sink, roundCounter, hasSentFinalResult, finalAnswerBuffer, useMemory, conversationId, agentState, thinkingBuffer, enableThinking);
 
+        String finalConversationId = conversationId;
+        String finalConversationId1 = conversationId;
         return sink.asFlux()
                 .doOnNext(chunk -> {
                     recordFirstResponse();
@@ -197,7 +202,7 @@ public class DearAgent extends BaseAgent {
                 .doOnCancel(() -> {
                     hasSentFinalResult.set(true);
                     if (taskManager != null) {
-                        taskManager.stopTask(conversationId);
+                        taskManager.stopTask(finalConversationId);
                     }
                 })
                 .doFinally(signalType -> {
@@ -205,11 +210,11 @@ public class DearAgent extends BaseAgent {
                     log.info("思考过程: {}", thinkingBuffer);
 
                     // 保存结果到会话
-                    saveSessionResult(conversationId, finalAnswerBuffer, thinkingBuffer, agentState);
+                    saveSessionResult(finalConversationId, finalAnswerBuffer, thinkingBuffer, agentState);
 
                     // 流结束时移除任务
                     if (taskManager != null) {
-                        taskManager.stopTask(conversationId);
+                        taskManager.stopTask(finalConversationId);
                     }
                 });
     }
