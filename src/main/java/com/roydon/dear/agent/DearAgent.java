@@ -183,7 +183,6 @@ public class DearAgent extends BaseAgent {
         scheduleRound(messages, sink, roundCounter, hasSentFinalResult, finalAnswerBuffer, useMemory, conversationId, agentState, thinkingBuffer, enableThinking);
 
         String finalConversationId = conversationId;
-        String finalConversationId1 = conversationId;
         return sink.asFlux()
                 .doOnNext(chunk -> {
                     recordFirstResponse();

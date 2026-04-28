@@ -19,6 +19,7 @@ public class AgentResponse {
     public static final String TYPE_RECOMMEND = "recommend";
     public static final String TYPE_EXPRESSION = "expression"; // 表情
     public static final String TYPE_DONE = "done"; // 完成标识
+    public static final String TYPE_AUDIO = "audio"; // 音频
 
     private String type;
     private String content;
