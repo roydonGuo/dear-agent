@@ -13,6 +13,7 @@ import com.roydon.dear.agent.DearAgent;
 import com.roydon.dear.domain.entity.AiSession;
 import com.roydon.dear.manager.AgentTaskManager;
 import com.roydon.dear.service.AiSessionService;
+import com.roydon.dear.tts.AgentVoiceStreamService;
 import io.modelcontextprotocol.client.McpClient;
 import io.modelcontextprotocol.client.McpSyncClient;
 import io.modelcontextprotocol.client.transport.HttpClientStreamableHttpTransport;
@@ -60,6 +61,9 @@ public class AgentController implements InitializingBean {
     @Autowired
     private AgentTaskManager taskManager;
 
+    @Autowired
+    private AgentVoiceStreamService agentVoiceStreamService;
+
     /**
      * Tavily 搜索引擎 API Key
      */
@@ -82,11 +86,15 @@ public class AgentController implements InitializingBean {
     public Flux<String> webSearchStream(@RequestParam(required = true) String query,
                                         @RequestParam(required = true) String conversationId,
                                         @RequestParam(required = false) Boolean think,
-                                        @RequestParam(required = false) Boolean webSearch) {
+                                        @RequestParam(required = false) Boolean webSearch,
+                                        @RequestParam(required = false, defaultValue = "false") Boolean voiceOutput,
+                                        @RequestParam(required = false) String voice) {
         // todo conversationId如果为空则创建session对话，返回给前端conversationId
 
         boolean thinkEnabled = Boolean.TRUE.equals(think);
-        log.info("收到请求: query={}, conversationId={}, think={}", query, conversationId, thinkEnabled);
+        boolean voiceEnabled = Boolean.TRUE.equals(voiceOutput);
+        log.info("收到请求: query={}, conversationId={}, think={}, voiceOutput={}, voice={}",
+                query, conversationId, thinkEnabled, voiceEnabled, voice);
 
         if (query == null || query.trim().isEmpty()) {
             log.warn("参数为空或无效");
@@ -96,7 +104,11 @@ public class AgentController implements InitializingBean {
         try {
             // 使用持久化记忆加载历史记录
             DearAgent dearAgent = initDearAgent(conversationId);
-            return dearAgent.stream(conversationId, query, thinkEnabled);
+            Flux<String> agentStream = dearAgent.stream(conversationId, query, thinkEnabled);
+            if (voiceEnabled) {
+                return agentVoiceStreamService.withVoice(agentStream, voice);
+            }
+            return agentStream;
         } catch (Exception e) {
             log.error("处理网页搜索请求时发生错误: ", e);
             return Flux.error(e);

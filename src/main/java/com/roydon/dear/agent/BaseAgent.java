@@ -18,6 +18,7 @@ import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.converter.BeanOutputConverter;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.util.StopWatch;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
 
@@ -308,6 +309,7 @@ public abstract class BaseAgent {
 
     /**
      * 生成推荐问题
+     * todo 为避免耗时问题，最好使用快速响应的小模型
      *
      * @param conversationId  会话ID
      * @param currentQuestion 当前问题
@@ -320,12 +322,15 @@ public abstract class BaseAgent {
         }
 
         try {
+            // 记录耗时
+            StopWatch sw = new StopWatch();
+            sw.start();
             List<Message> messages = new ArrayList<>();
 
             // 1. 添加系统提示词
             messages.add(new SystemMessage(ReactAgentPrompts.getRecommendPrompt()));
 
-            // 2. 添加历史消息
+            // 2. 添加历史消息 todo 将历史消息全加载进来
             loadChatHistory(conversationId, messages, true, true);
 
             // 3. 添加当前会话的消息（最新的消息，放在最后）
@@ -355,7 +360,9 @@ public abstract class BaseAgent {
                 List<String> recommendations = converter.convert(response);
                 if (recommendations != null && !recommendations.isEmpty()) {
                     String jsonStr = JSON.toJSONString(recommendations);
-                    log.info("生成推荐问题成功: {}", jsonStr);
+                    sw.stop();
+                    // 耗时：11030ms
+                    log.info("生成推荐问题成功: {}，耗时：{}ms", jsonStr,sw.getTotalTimeMillis());
                     return jsonStr;
                 }
             }
