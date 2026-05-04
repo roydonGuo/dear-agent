@@ -30,6 +30,12 @@ public class AgentVoiceStreamService {
 
     private static final int MAX_TTS_TEXT_LENGTH = 220;
 
+    /**
+     * 最小 TTS 文本块长度（字符）。
+     * 短于此长度的"句子"会继续在 buffer 中累积，避免零散片段触发 TTS。
+     */
+    private static final int MIN_TTS_CHUNK_LENGTH = 20;
+
     private final AlibabaTtsService ttsService;
 
     public Flux<String> withVoice(Flux<String> agentStream, String voice) {
@@ -41,8 +47,7 @@ public class AgentVoiceStreamService {
                             .subscribeOn(Schedulers.boundedElastic())
                             .map(audioBytes -> createAudioEvent(audioBytes, state.voice(), request.sequence()))
                             .onErrorResume(error -> {
-                                log.warn("TTS failed for sentence sequence {}: {}",
-                                        request.sequence(), error.getMessage());
+                                log.warn("TTS failed for sentence sequence {}: {}", request.sequence(), error.getMessage());
                                 return Flux.empty();
                             }))
                     .subscribe(
@@ -128,13 +133,24 @@ public class AgentVoiceStreamService {
         List<String> sentences = new ArrayList<>();
         int endIndex;
         while ((endIndex = findSentenceEnd(buffer)) >= 0) {
-            String sentence = buffer.substring(0, endIndex + 1).trim();
+            String rawSentence = buffer.substring(0, endIndex + 1);
+            int trimmedLen = rawSentence.trim().length();
+
+            // 句子太短且 buffer 还没满 → 留在 buffer 中等更多内容
+            if (trimmedLen < MIN_TTS_CHUNK_LENGTH
+                    && buffer.length() - (endIndex + 1) + trimmedLen < MAX_TTS_TEXT_LENGTH) {
+                break;
+            }
+
             buffer.delete(0, endIndex + 1);
-            splitLongText(sentence).forEach(part -> {
-                if (StringUtils.isNotBlank(part)) {
-                    sentences.add(part.trim());
-                }
-            });
+            String cleaned = cleanTextForTts(rawSentence.trim());
+            if (StringUtils.isNotBlank(cleaned)) {
+                splitLongText(cleaned).forEach(part -> {
+                    if (StringUtils.isNotBlank(part)) {
+                        sentences.add(part.trim());
+                    }
+                });
+            }
         }
         return sentences;
     }
@@ -157,8 +173,7 @@ public class AgentVoiceStreamService {
                 || ch == '.'
                 || ch == '!'
                 || ch == '?'
-                || ch == ';'
-                || ch == '\n';
+                || ch == ';';
     }
 
     private List<String> splitLongText(String text) {
@@ -175,6 +190,45 @@ public class AgentVoiceStreamService {
         return parts;
     }
 
+    /**
+     * 清理文本中的 markdown / 标记符号，使 TTS 朗读更自然。
+     * - 移除表格分隔行（|---|---|---）
+     * - 移除隔离的分隔线（---\n）
+     * - 移除加粗/斜体标记 **text* -> text
+     * - 移除表格竖线
+     * - 移除标题 # 号
+     * - 将 markdown 链接 [text](url) 替换为 text
+     * - 移除反引号
+     * - 合并多余空行/空格
+     */
+    private String cleanTextForTts(String text) {
+        if (text == null) {
+            return null;
+        }
+        // 移除表格分隔行：|---|---|---
+        text = text.replaceAll("\\|[-]+\\|[-]+\\|", "");
+        // 移除纯分隔线（单独一行 --- 或 ***）
+        text = text.replaceAll("(?m)^[-]{3,}$", "");
+        text = text.replaceAll("(?m)^[*]{3,}$", "");
+        // 移除加粗/斜体标记 **text** -> text / *text* -> text
+        text = text.replaceAll("\\*\\*(.*?)\\*\\*", "$1");
+        text = text.replaceAll("\\*([^*]+)\\*", "$1");
+        // 移除表格竖线
+        text = text.replace("|", "");
+        // 移除标题标记
+        text = text.replaceAll("(?m)^#+\\s*", "");
+        // 替换 markdown 链接
+        text = text.replaceAll("\\[([^\\]]+)]\\([^)]+\\)", "$1");
+        // 移除反引号
+        text = text.replace("`", "");
+        // 合并多个换行为句号
+        text = text.replaceAll("\\n{3,}", "。");
+        text = text.replaceAll("\\n+", "。");
+        // 合并连续空格
+        text = text.replaceAll("\\s{2,}", " ").trim();
+        return text;
+    }
+
     private void flushRemainingText(VoiceStreamState state) {
         String remaining;
         synchronized (state.textBuffer()) {
@@ -182,9 +236,14 @@ public class AgentVoiceStreamService {
             state.textBuffer().setLength(0);
         }
 
-        splitLongText(remaining).forEach(sentence -> {
-            if (StringUtils.isNotBlank(sentence)) {
-                queueTts(sentence.trim(), state);
+        String cleaned = cleanTextForTts(remaining);
+        if (StringUtils.isBlank(cleaned)) {
+            return;
+        }
+
+        splitLongText(cleaned).forEach(part -> {
+            if (StringUtils.isNotBlank(part)) {
+                queueTts(part.trim(), state);
             }
         });
     }

@@ -140,11 +140,12 @@ public class DearAgent extends BaseAgent {
             return Flux.error(new IllegalStateException("该会话正在执行中，请稍后再试"));
         }
 
-        // todo 加载agent设定
         // ===== 加载 System Prompt（始终放在最开始）=====
-        messages.add(new SystemMessage(ReactAgentPrompts.getDearAgentPrompt()));
+        // 优先使用外部传入的 systemPrompt，否则使用默认提示词
         if (StringUtils.isNotBlank(systemPrompt)) {
             messages.add(new SystemMessage(systemPrompt));
+        } else {
+            messages.add(new SystemMessage(ReactAgentPrompts.getDearAgentPrompt()));
         }
 
         // ===== 加载历史记忆 =====
@@ -387,10 +388,11 @@ public class DearAgent extends BaseAgent {
         // 创建新的消息列表，确保系统提示词在最前面
         List<Message> newMessages = new ArrayList<>();
 
-        // 添加系统提示词
-        newMessages.add(new SystemMessage(ReactAgentPrompts.getWebSearchPrompt()));
+        // 添加系统提示词 — 优先使用外部传入的 systemPrompt
         if (StringUtils.isNotBlank(systemPrompt)) {
             newMessages.add(new SystemMessage(systemPrompt));
+        } else {
+            newMessages.add(new SystemMessage(ReactAgentPrompts.getWebSearchPrompt()));
         }
 
         // 添加原有消息（跳过系统消息）

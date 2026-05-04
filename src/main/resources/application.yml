@@ -77,6 +77,9 @@ tavily:
 
 logging:
   level:
+    com:
+      roydon:
+        agent: debug
     org:
       springframework:
         ai: debug

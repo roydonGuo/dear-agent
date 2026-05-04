@@ -45,7 +45,7 @@ public class AlibabaTtsService {
      */
     public Flux<byte[]> streamSynthesize(String text, String voice) {
         log.info("🔊 开始流式语音合成 - 模型: {}, 音色: {}", ttsConfig.getModel(), voice);
-        log.debug("📝 文本内容: {}", text.length() > 50 ? text.substring(0, 50) + "..." : text);
+        log.info("📝 文本内容: {}", text.length() > 50 ? text.substring(0, 50) + "..." : text);
 
         WebClient webClient = WebClient.builder()
             .baseUrl(ttsConfig.getBaseUrl())

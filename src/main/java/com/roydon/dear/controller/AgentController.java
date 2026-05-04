@@ -13,6 +13,8 @@ import com.roydon.dear.agent.DearAgent;
 import com.roydon.dear.domain.entity.AiSession;
 import com.roydon.dear.manager.AgentTaskManager;
 import com.roydon.dear.service.AiSessionService;
+import com.roydon.dear.prompts.ReactAgentPrompts;
+import com.roydon.dear.tool.FileOperationTools;
 import com.roydon.dear.tts.AgentVoiceStreamService;
 import io.modelcontextprotocol.client.McpClient;
 import io.modelcontextprotocol.client.McpSyncClient;
@@ -28,6 +30,7 @@ import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.mcp.SyncMcpToolCallbackProvider;
 import org.springframework.ai.tool.ToolCallback;
+import org.springframework.ai.tool.method.MethodToolCallbackProvider;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -64,6 +67,9 @@ public class AgentController implements InitializingBean {
     @Autowired
     private AgentVoiceStreamService agentVoiceStreamService;
 
+    @Autowired
+    private FileOperationTools fileOperationTools;
+
     /**
      * Tavily 搜索引擎 API Key
      */
@@ -81,6 +87,16 @@ public class AgentController implements InitializingBean {
      */
     private ToolCallback[] webSearchToolCallbacks;
 
+    /**
+     * 文件操作工具回调
+     */
+    private ToolCallback[] fileToolCallbacks;
+
+    /**
+     * 合并后的全部工具回调
+     */
+    private ToolCallback[] allToolCallbacks;
+
     @GetMapping(value = "/chat/stream", produces = "text/event-stream;charset=UTF-8")
     @Operation(summary = "智能问答", description = "接收用户查询并返回流式响应，使用联网搜索获取信息")
     public Flux<String> webSearchStream(@RequestParam(required = true) String query,
@@ -92,9 +108,10 @@ public class AgentController implements InitializingBean {
         // todo conversationId如果为空则创建session对话，返回给前端conversationId
 
         boolean thinkEnabled = Boolean.TRUE.equals(think);
+        boolean webSearchEnabled = Boolean.TRUE.equals(webSearch);
         boolean voiceEnabled = Boolean.TRUE.equals(voiceOutput);
-        log.info("收到请求: query={}, conversationId={}, think={}, voiceOutput={}, voice={}",
-                query, conversationId, thinkEnabled, voiceEnabled, voice);
+        log.info("收到请求: query={}, conversationId={}, think={}, webSearch={}, voiceOutput={}, voice={}",
+                query, conversationId, thinkEnabled, webSearchEnabled, voiceEnabled, voice);
 
         if (query == null || query.trim().isEmpty()) {
             log.warn("参数为空或无效");
@@ -103,7 +120,7 @@ public class AgentController implements InitializingBean {
 
         try {
             // 使用持久化记忆加载历史记录
-            DearAgent dearAgent = initDearAgent(conversationId);
+            DearAgent dearAgent = initDearAgent(conversationId, webSearchEnabled);
             Flux<String> agentStream = dearAgent.stream(conversationId, query, thinkEnabled);
             if (voiceEnabled) {
                 return agentVoiceStreamService.withVoice(agentStream, voice);
@@ -164,7 +181,16 @@ public class AgentController implements InitializingBean {
         // 初始化网页搜索工具回调
         initWebSearchToolCallbacks();
 
-        log.info("工具toolcallback初始化完成");
+        // 初始化文件操作工具回调
+        initFileToolCallbacks();
+
+        // 合并所有工具回调
+        allToolCallbacks = new ToolCallback[webSearchToolCallbacks.length + fileToolCallbacks.length];
+        System.arraycopy(webSearchToolCallbacks, 0, allToolCallbacks, 0, webSearchToolCallbacks.length);
+        System.arraycopy(fileToolCallbacks, 0, allToolCallbacks, webSearchToolCallbacks.length, fileToolCallbacks.length);
+
+        log.info("工具toolcallback初始化完成，网页搜索工具: {}, 文件操作工具: {}, 总计: {}",
+                webSearchToolCallbacks.length, fileToolCallbacks.length, allToolCallbacks.length);
     }
 
     /**
@@ -194,14 +220,44 @@ public class AgentController implements InitializingBean {
     }
 
     /**
-     * 初始化 Agent
+     * 初始化文件操作工具回调
      */
-    private DearAgent initDearAgent(String conversationId) {
-        log.info("初始化 Agent...");
+    private void initFileToolCallbacks() {
+        log.info("初始化文件操作工具回调...");
+
+        MethodToolCallbackProvider provider = MethodToolCallbackProvider.builder()
+                .toolObjects(fileOperationTools)
+                .build();
+        fileToolCallbacks = provider.getToolCallbacks();
+
+        log.info("文件操作工具回调初始化完成，工具数量: {}", fileToolCallbacks.length);
+    }
+
+    /**
+     * 初始化 Agent
+     *
+     * @param webSearchEnabled 是否启用网络搜索
+     */
+    private DearAgent initDearAgent(String conversationId, boolean webSearchEnabled) {
+        String prompt;
+        ToolCallback[] tools;
+        if (webSearchEnabled) {
+            // 联网模式：搜索工具 + 文件操作工具 + 搜索导向提示词
+            prompt = ReactAgentPrompts.getDearAgentPrompt();
+            tools = allToolCallbacks;
+            log.info("初始化 Agent（联网模式），工具数量: {}", tools.length);
+        } else {
+            // 离线模式：仅文件操作工具 + 文件操作导向提示词
+            prompt = ReactAgentPrompts.getFileOperationPrompt();
+            tools = fileToolCallbacks;
+            log.info("初始化 Agent（离线文件操作模式），工具数量: {}", tools.length);
+        }
+
         DearAgent dearReact = DearAgent.builder()
                 .name("dear react")
                 .chatModel(chatModel)
-                .tools(webSearchToolCallbacks)
+                .tools(tools)
+                .systemPrompt(prompt)
                 .sessionService(sessionService)
                 .taskManager(taskManager)
                 .maxRounds(5)
