@@ -11,7 +11,9 @@
       "Bash(mkdir -p app/src/main/resources/mapper)",
       "Bash(mkdir -p module-common/src/main/java/com/roydon/dear/common)",
       "Bash(mkdir -p module-common/src/main/java/com/roydon/dear/common/prompts)",
-      "Bash(mvn compile *)"
+      "Bash(mvn compile *)",
+      "Read(//c/Users/31330/.m2/wrapper/dists/apache-maven-3.9.9-bin/**)",
+      "Read(//c/Users/31330/.m2/wrapper/dists/apache-maven-3.8.7-bin/**)"
     ]
   }
 }

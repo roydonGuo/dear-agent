@@ -1,8 +1,10 @@
 package com.roydon.dear.web.controller;
 
 import com.roydon.dear.agent.DearAgent;
+import com.roydon.dear.common.AgentResponse;
 import com.roydon.dear.common.manager.AgentTaskManager;
 import com.roydon.dear.common.prompts.ReactAgentPrompts;
+import com.roydon.dear.model.registry.ModelRegistry;
 import com.roydon.dear.model.tts.AgentVoiceStreamService;
 import com.roydon.dear.session.entity.AiSession;
 import com.roydon.dear.session.service.AiSessionService;
@@ -33,7 +35,7 @@ import java.util.Map;
 public class AgentController {
 
     @Autowired
-    private ChatModel chatModel;
+    private ModelRegistry modelRegistry;
 
     @Autowired
     private AiSessionService sessionService;
@@ -73,9 +75,16 @@ public class AgentController {
                 return agentVoiceStreamService.withVoice(agentStream, voice);
             }
             return agentStream;
+        } catch (IllegalStateException e) {
+            log.warn("模型配置异常: {}", e.getMessage());
+            return Flux.just(
+                    AgentResponse.error("模型未配置：" + e.getMessage()),
+                    AgentResponse.done("error"));
         } catch (Exception e) {
             log.error("处理网页搜索请求时发生错误: ", e);
-            return Flux.error(e);
+            return Flux.just(
+                    AgentResponse.error("服务异常：" + e.getMessage()),
+                    AgentResponse.done("error"));
         }
     }
 
@@ -108,6 +117,8 @@ public class AgentController {
             tools = mcpToolManager.getFileTools();
             log.info("初始化 Agent（离线文件操作模式），工具数量: {}", tools.length);
         }
+
+        ChatModel chatModel = modelRegistry.getDefaultChatModel("chat");
 
         DearAgent dearReact = DearAgent.builder()
                 .name("dear react")

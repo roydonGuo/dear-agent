@@ -1,0 +1,43 @@
+package com.roydon.dear.model.provider;
+
+import com.roydon.dear.session.entity.ModelConfig;
+import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.openai.OpenAiChatModel;
+import org.springframework.ai.openai.OpenAiChatOptions;
+import org.springframework.ai.openai.api.OpenAiApi;
+import org.springframework.stereotype.Component;
+
+@Component
+public class OpenAiModelProvider implements ModelProvider {
+
+    @Override
+    public String getProviderName() {
+        return "openai";
+    }
+
+    @Override
+    public ChatModel createChatModel(ModelConfig config) {
+        OpenAiApi openAiApi = OpenAiApi.builder()
+                .apiKey(config.getApiKey())
+                .baseUrl(config.getBaseUrl())
+                .build();
+
+        OpenAiChatOptions.Builder optionsBuilder = OpenAiChatOptions.builder()
+                .model(config.getModel());
+
+        if (config.getTemperature() != null) {
+            optionsBuilder.temperature(config.getTemperature());
+        }
+        if (config.getMaxTokens() != null) {
+            optionsBuilder.maxTokens(config.getMaxTokens());
+        }
+        if (config.getTopP() != null) {
+            optionsBuilder.topP(config.getTopP());
+        }
+
+        return OpenAiChatModel.builder()
+                .openAiApi(openAiApi)
+                .defaultOptions(optionsBuilder.build())
+                .build();
+    }
+}

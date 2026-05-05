@@ -22,11 +22,11 @@ public class McpToolManager {
     @Autowired
     private FileOperationTools fileOperationTools;
 
-    @Autowired
-    private WeatherService weatherService;
+//    @Autowired
+//    private WeatherService weatherService;
 
     private ToolCallback[] fileToolCallbacks;
-    private ToolCallback[] weatherToolCallbacks;
+//    private ToolCallback[] weatherToolCallbacks;
 
     @PostConstruct
     public void init() {
@@ -34,18 +34,18 @@ public class McpToolManager {
                 .toolObjects(fileOperationTools).build();
         fileToolCallbacks = fileProvider.getToolCallbacks();
 
-        MethodToolCallbackProvider weatherProvider = MethodToolCallbackProvider.builder()
-                .toolObjects(weatherService).build();
-        weatherToolCallbacks = weatherProvider.getToolCallbacks();
+//        MethodToolCallbackProvider weatherProvider = MethodToolCallbackProvider.builder()
+//                .toolObjects(weatherService).build();
+//        weatherToolCallbacks = weatherProvider.getToolCallbacks();
 
-        log.info("内置工具初始化完成，文件操作: {}, 天气: {}", fileToolCallbacks.length, weatherToolCallbacks.length);
+        log.info("内置工具初始化完成，文件操作: {}", fileToolCallbacks.length);
     }
 
     public ToolCallback[] getAllTools() {
         List<ToolCallback> all = new ArrayList<>();
         all.addAll(registry.getAllToolCallbacks());
         all.addAll(Arrays.asList(fileToolCallbacks));
-        all.addAll(Arrays.asList(weatherToolCallbacks));
+//        all.addAll(Arrays.asList(weatherToolCallbacks));
         return all.toArray(ToolCallback[]::new);
     }
 

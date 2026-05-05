@@ -1,10 +1,11 @@
 package com.roydon.dear.model.tts;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.roydon.dear.model.registry.ModelRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.openai.OpenAiChatModel;
+import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
@@ -20,7 +21,7 @@ import java.util.concurrent.atomic.AtomicReference;
 @RequiredArgsConstructor
 public class RealtimeVoiceAgentService {
 
-    private final OpenAiChatModel chatModel;
+    private final ModelRegistry modelRegistry;
     private final AlibabaTtsService ttsService;
     private final ObjectMapper objectMapper;
 
@@ -30,6 +31,17 @@ public class RealtimeVoiceAgentService {
 
     public Flux<ServerSentEvent<String>> streamAgentWithVoice(String userMessage, String voice, String sessionId) {
         log.info("开始处理 - 会话: {}, 消息: {}", sessionId, userMessage);
+
+        ChatModel chatModel;
+        try {
+            chatModel = modelRegistry.getDefaultChatModel("chat");
+        } catch (IllegalStateException e) {
+            log.warn("模型配置异常: {}", e.getMessage());
+            return Flux.just(ServerSentEvent.<String>builder()
+                    .event("error")
+                    .data(toJson(Map.of("error", "模型未配置：" + e.getMessage())))
+                    .build());
+        }
 
         AtomicReference<StringBuilder> fullTextAccumulator = new AtomicReference<>(new StringBuilder());
 
