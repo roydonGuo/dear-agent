@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.roydon.dear</groupId>
+        <artifactId>dear-agent</artifactId>
+        <version>1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>module-tool</artifactId>
+    <description>Tool 系统：Spring AI ToolCallback 实现（FileOperationTools/WeatherService）+ McpToolManager（Tavily MCP 客户端初始化与 ToolCallback 合并管理）</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.roydon.dear</groupId>
+            <artifactId>module-common</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-mcp-client</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.roydon.dear</groupId>
+            <artifactId>module-session</artifactId>
+        </dependency>
+    </dependencies>
+
+</project>

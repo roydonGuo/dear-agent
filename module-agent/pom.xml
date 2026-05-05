@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.roydon.dear</groupId>
+        <artifactId>dear-agent</artifactId>
+        <version>1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>module-agent</artifactId>
+    <description>Agent 核心：BaseAgent（抽象基类，含 ChatMemory 加载/推荐问题生成/任务管理），DearAgent（生产级主 Agent，支持 Thinking 提取/多轮 Tool Calling），WebSearchReactAgent（简化版），ReactAgent（无持久化独立 Agent）</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.roydon.dear</groupId>
+            <artifactId>module-common</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.roydon.dear</groupId>
+            <artifactId>module-tool</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.roydon.dear</groupId>
+            <artifactId>module-session</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.roydon.dear</groupId>
+            <artifactId>module-model</artifactId>
+        </dependency>
+<!--        <dependency>-->
+<!--            <groupId>org.springframework.ai</groupId>-->
+<!--            <artifactId>spring-ai-alibaba-agent-framework</artifactId>-->
+<!--            <version>${spring.ai.alibaba.framework.version}</version>-->
+<!--            <exclusions>-->
+<!--                <exclusion>-->
+<!--                    <artifactId>mcp</artifactId>-->
+<!--                    <groupId>io.modelcontextprotocol.sdk</groupId>-->
+<!--                </exclusion>-->
+<!--            </exclusions>-->
+<!--        </dependency>-->
+    </dependencies>
+
+</project>

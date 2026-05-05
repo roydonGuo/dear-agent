@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.roydon.dear</groupId>
+        <artifactId>dear-agent</artifactId>
+        <version>1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>module-knowledge</artifactId>
+    <description>知识库模块（预留）：为后续实现 RAG 向量检索、文档知识库等功能预留的模块</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.roydon.dear</groupId>
+            <artifactId>module-common</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.roydon.dear</groupId>
+            <artifactId>module-model</artifactId>
+        </dependency>
+    </dependencies>
+
+</project>

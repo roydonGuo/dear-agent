@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(java -version)",
+      "Bash(/d/Java/jdk-21.0.4/bin/java -version)",
+      "Bash(npm list *)",
+      "Bash(npm cache *)",
+      "Bash(npx --yes maven --version)",
+      "Bash(cd /d \"D:\\\\JetBrains\\\\JavaProjects\\\\dear-agent\")",
+      "Bash(mkdir -p app/src/main/java/com/roydon/dear)",
+      "Bash(mkdir -p app/src/main/resources/mapper)",
+      "Bash(mkdir -p module-common/src/main/java/com/roydon/dear/common)",
+      "Bash(mkdir -p module-common/src/main/java/com/roydon/dear/common/prompts)",
+      "Bash(mvn compile *)"
+    ]
+  }
+}
