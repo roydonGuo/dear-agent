@@ -1,5 +1,6 @@
 package com.roydon.dear.tool;
 
+import com.roydon.dear.skill.tool.SkillsTool;
 import com.roydon.dear.tool.registry.McpRegistry;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
@@ -16,28 +17,22 @@ import java.util.List;
 @Component
 public class McpToolManager {
 
+    @Autowired(required = false)
+    private SkillsTool skillsTool;
+
     @Autowired
     private McpRegistry registry;
 
     @Autowired
     private FileOperationTools fileOperationTools;
 
-//    @Autowired
-//    private WeatherService weatherService;
-
     private ToolCallback[] fileToolCallbacks;
-//    private ToolCallback[] weatherToolCallbacks;
 
     @PostConstruct
     public void init() {
         MethodToolCallbackProvider fileProvider = MethodToolCallbackProvider.builder()
                 .toolObjects(fileOperationTools).build();
         fileToolCallbacks = fileProvider.getToolCallbacks();
-
-//        MethodToolCallbackProvider weatherProvider = MethodToolCallbackProvider.builder()
-//                .toolObjects(weatherService).build();
-//        weatherToolCallbacks = weatherProvider.getToolCallbacks();
-
         log.info("内置工具初始化完成，文件操作: {}", fileToolCallbacks.length);
     }
 
@@ -45,11 +40,17 @@ public class McpToolManager {
         List<ToolCallback> all = new ArrayList<>();
         all.addAll(registry.getAllToolCallbacks());
         all.addAll(Arrays.asList(fileToolCallbacks));
-//        all.addAll(Arrays.asList(weatherToolCallbacks));
+        if (skillsTool != null) {
+            all.addAll(Arrays.asList(skillsTool.getAllToolCallbacks()));
+        }
         return all.toArray(ToolCallback[]::new);
     }
 
     public ToolCallback[] getFileTools() {
         return fileToolCallbacks;
+    }
+
+    public ToolCallback[] getSkillTools() {
+        return skillsTool != null ? skillsTool.getAllToolCallbacks() : new ToolCallback[0];
     }
 }

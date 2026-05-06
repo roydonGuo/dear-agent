@@ -113,7 +113,7 @@ public class AgentController {
             tools = mcpToolManager.getAllTools();
             log.info("初始化 Agent（联网模式），工具数量: {}", tools.length);
         } else {
-            prompt = ReactAgentPrompts.getFileOperationPrompt();
+            prompt = ReactAgentPrompts.getDearAgentSysPrompt();
             tools = mcpToolManager.getFileTools();
             log.info("初始化 Agent（离线文件操作模式），工具数量: {}", tools.length);
         }

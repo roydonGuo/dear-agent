@@ -24,6 +24,7 @@
         <module>module-model</module>
         <module>module-tool</module>
         <module>module-agent</module>
+        <module>module-skill</module>
         <module>module-web</module>
         <module>module-knowledge</module>
     </modules>
@@ -100,6 +101,11 @@
             <dependency>
                 <groupId>com.roydon.dear</groupId>
                 <artifactId>module-web</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.roydon.dear</groupId>
+                <artifactId>module-skill</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

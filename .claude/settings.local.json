@@ -13,7 +13,13 @@
       "Bash(mkdir -p module-common/src/main/java/com/roydon/dear/common/prompts)",
       "Bash(mvn compile *)",
       "Read(//c/Users/31330/.m2/wrapper/dists/apache-maven-3.9.9-bin/**)",
-      "Read(//c/Users/31330/.m2/wrapper/dists/apache-maven-3.8.7-bin/**)"
+      "Read(//c/Users/31330/.m2/wrapper/dists/apache-maven-3.8.7-bin/**)",
+      "Bash('D:/JetBrains/IntelliJ IDEA 2024.1.4/plugins/maven/lib/maven3/bin/mvn' compile -pl module-skill -am)",
+      "Bash(javap -classpath /c/Users/31330/.m2/repository/org/springframework/ai/spring-ai-model/1.1.0/spring-ai-model-1.1.0.jar org.springframework.ai.tool.definition.ToolDefinition)",
+      "Bash(javap -classpath /c/Users/31330/.m2/repository/org/springframework/ai/spring-ai-model/1.1.0/spring-ai-model-1.1.0.jar org.springframework.ai.tool.definition.DefaultToolDefinition)",
+      "Bash(javap -classpath /c/Users/31330/.m2/repository/org/springframework/ai/spring-ai-model/1.1.0/spring-ai-model-1.1.0.jar org.springframework.ai.chat.model.ToolContext)",
+      "WebFetch(domain:spring-ai-community.github.io)",
+      "Bash(xargs -I{} basename {} .jar)"
     ]
   }
 }
