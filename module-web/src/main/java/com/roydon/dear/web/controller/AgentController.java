@@ -109,8 +109,8 @@ public class AgentController {
         String prompt;
         ToolCallback[] tools;
 //        if (webSearchEnabled) {
-            prompt = ReactAgentPrompts.getDearAgentPrompt();
-            tools = mcpToolManager.getAllTools();
+        prompt = ReactAgentPrompts.getDearAgentPrompt();
+        tools = mcpToolManager.getAllTools();
 //            log.info("初始化 Agent（联网模式），工具数量: {}", tools.length);
 //        } else {
 //            prompt = ReactAgentPrompts.getFileOperationPrompt();

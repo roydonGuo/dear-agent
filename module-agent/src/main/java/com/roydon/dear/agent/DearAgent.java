@@ -356,13 +356,14 @@ public class DearAgent extends BaseAgent {
                     completeToolCall(completedCount, totalToolCalls, responseMap, toolCalls, messages, onComplete);
                     return;
                 }
-                if (toolName.contains("search")) {
-                    JSONObject args = JSON.parseObject(argsJson);
-                    String query = (String) args.get("query");
-                    String queryThink = StringUtils.isNotBlank(query) ? "🔍 正在搜索信息: " + query + "\n" : "🔍 正在搜索相关信息\n";
-                    thinkingBuffer.append(queryThink);
-                    if (enableThinking) sink.tryEmitNext(createThinkingResponse(queryThink));
-                }
+                // todo 当触发搜索tool，emit
+//                if (toolName.contains("search")) {
+//                    JSONObject args = JSON.parseObject(argsJson);
+//                    String query = (String) args.get("query");
+//                    String queryThink = StringUtils.isNotBlank(query) ? "🔍 正在搜索信息: " + query + "\n" : "🔍 正在搜索相关信息\n";
+//                    thinkingBuffer.append(queryThink);
+//                    if (enableThinking) sink.tryEmitNext(createThinkingResponse(queryThink));
+//                }
 
                 try {
                     Object result = callback.call(argsJson);

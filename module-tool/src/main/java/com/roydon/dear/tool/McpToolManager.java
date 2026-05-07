@@ -37,9 +37,13 @@ public class McpToolManager {
     }
 
     public ToolCallback[] getAllTools() {
+        // 加载所有类型工具
         List<ToolCallback> all = new ArrayList<>();
-        all.addAll(registry.getAllToolCallbacks());
+        // 1、function call
         all.addAll(Arrays.asList(fileToolCallbacks));
+        // 2、MCP 工具
+        all.addAll(registry.getAllToolCallbacks());
+        // 3、skill
         if (skillsTool != null) {
             all.addAll(Arrays.asList(skillsTool.getAllToolCallbacks()));
         }

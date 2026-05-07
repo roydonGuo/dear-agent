@@ -27,6 +27,7 @@
         <module>module-skill</module>
         <module>module-web</module>
         <module>module-knowledge</module>
+        <module>module-starter</module>
     </modules>
 
     <properties>

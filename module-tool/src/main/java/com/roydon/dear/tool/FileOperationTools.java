@@ -79,7 +79,10 @@ public class FileOperationTools {
             } else {
                 return Files.readString(path, StandardCharsets.UTF_8);
             }
-        } catch (Exception e) { log.error("读取文件失败", e); return "读取文件失败: " + e.getMessage(); }
+        } catch (Exception e) {
+            log.error("读取文件失败", e);
+            return "读取文件失败: " + e.getMessage();
+        }
     }
 
     @Tool(name = "write_file", description = "写入文件（覆盖）/ Write (overwrite) file")
@@ -93,7 +96,10 @@ public class FileOperationTools {
             if (parent != null && !Files.exists(parent)) Files.createDirectories(parent);
             Files.writeString(path, content, StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
             return "文件写入成功: " + path.toAbsolutePath() + " (大小: " + content.length() + " 字符)";
-        } catch (Exception e) { log.error("写入文件失败", e); return "写入文件失败: " + e.getMessage(); }
+        } catch (Exception e) {
+            log.error("写入文件失败", e);
+            return "写入文件失败: " + e.getMessage();
+        }
     }
 
     @Tool(name = "edit_file", description = "精确文本替换（替换文件中的第一个匹配项）/ Exact text replacement (replaces first match)")
@@ -110,6 +116,9 @@ public class FileOperationTools {
             String newContent = content.replaceFirst(Pattern.quote(oldString), Matcher.quoteReplacement(newString));
             Files.writeString(path, newContent, StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
             return "替换成功: " + path.toAbsolutePath();
-        } catch (Exception e) { log.error("编辑文件失败", e); return "编辑文件失败: " + e.getMessage(); }
+        } catch (Exception e) {
+            log.error("编辑文件失败", e);
+            return "编辑文件失败: " + e.getMessage();
+        }
     }
 }
