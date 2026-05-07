@@ -43,6 +43,8 @@ public class ModelAdminController {
         cfg.setId(null);
         validateProvider(cfg);
         configService.save(cfg);
+        // todo 保存后要将模型刷新到缓存
+        registry.refresh(cfg.getId());
         return BaseResult.newSuccess(cfg);
     }
 

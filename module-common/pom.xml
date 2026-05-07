@@ -11,7 +11,9 @@
     </parent>
 
     <artifactId>module-common</artifactId>
-    <description>公共模块：统一响应模型（BaseResult/AgentResponse）、提示词模板、AgentTaskManager（Redisson 分布式任务管理）、Agent 领域模型（AgentState/RoundState 等）</description>
+    <description>公共模块：统一响应模型（BaseResult/AgentResponse）、提示词模板、AgentTaskManager（Redisson 分布式任务管理）、Agent
+        领域模型（AgentState/RoundState 等）
+    </description>
 
     <dependencies>
         <dependency>
@@ -49,6 +51,22 @@
         <dependency>
             <groupId>io.projectreactor</groupId>
             <artifactId>reactor-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>mysql</groupId>
+            <artifactId>mysql-connector-java</artifactId>
+            <version>${mysql.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+            <version>${mybatis.version}</version>
+        </dependency>
+        <!-- 社区版spring ai 集成skill和multi agent：https://github.com/spring-ai-community/spring-ai-agent-utils -->
+        <dependency>
+            <groupId>org.springaicommunity</groupId>
+            <artifactId>spring-ai-agent-utils</artifactId>
+            <version>0.7.0</version>
         </dependency>
     </dependencies>
 

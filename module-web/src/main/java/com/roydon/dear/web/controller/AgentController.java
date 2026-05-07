@@ -108,15 +108,15 @@ public class AgentController {
     private DearAgent initDearAgent(String conversationId, boolean webSearchEnabled) {
         String prompt;
         ToolCallback[] tools;
-        if (webSearchEnabled) {
+//        if (webSearchEnabled) {
             prompt = ReactAgentPrompts.getDearAgentPrompt();
             tools = mcpToolManager.getAllTools();
-            log.info("初始化 Agent（联网模式），工具数量: {}", tools.length);
-        } else {
-            prompt = ReactAgentPrompts.getDearAgentSysPrompt();
-            tools = mcpToolManager.getFileTools();
-            log.info("初始化 Agent（离线文件操作模式），工具数量: {}", tools.length);
-        }
+//            log.info("初始化 Agent（联网模式），工具数量: {}", tools.length);
+//        } else {
+//            prompt = ReactAgentPrompts.getFileOperationPrompt();
+//            tools = mcpToolManager.getFileTools();
+//            log.info("初始化 Agent（离线文件操作模式），工具数量: {}", tools.length);
+//        }
 
         ChatModel chatModel = modelRegistry.getDefaultChatModel("chat");
 

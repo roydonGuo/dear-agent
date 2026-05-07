@@ -123,7 +123,10 @@ public class DearAgent extends BaseAgent {
 
         if (sessionService != null) {
             AiSession savedSession = sessionService.saveQuestion(
-                    SaveQuestionRequest.builder().sessionId(conversationId).question(question).build());
+                    SaveQuestionRequest.builder()
+                            .sessionId(conversationId)
+                            .question(question)
+                            .build());
             currentSessionId = savedSession.getId();
         }
 
@@ -136,6 +139,7 @@ public class DearAgent extends BaseAgent {
         StringBuilder thinkingBuffer = new StringBuilder();
         AgentState agentState = new AgentState();
 
+        // 轮询
         scheduleRound(messages, sink, roundCounter, hasSentFinalResult, finalAnswerBuffer, useMemory, conversationId, agentState, thinkingBuffer, enableThinking);
 
         String finalConversationId = conversationId;
@@ -200,6 +204,9 @@ public class DearAgent extends BaseAgent {
         if (conversationId != null && taskManager != null) taskManager.setDisposable(conversationId, disposable);
     }
 
+    /**
+     * 处理ChatResponse
+     */
     private void processChunk(ChatResponse chunk, Sinks.Many<String> sink, RoundState state, StringBuilder thinkingBuffer, boolean enableThinking) {
         if (chunk == null || chunk.getResult() == null || chunk.getResult().getOutput() == null) return;
         Generation gen = chunk.getResult();
@@ -235,6 +242,9 @@ public class DearAgent extends BaseAgent {
         state.toolCalls.add(incoming);
     }
 
+    /**
+     * 轮结束
+     */
     private void finishRound(List<Message> messages, Sinks.Many<String> sink, RoundState state,
                              AtomicLong roundCounter, AtomicBoolean hasSentFinalResult, StringBuilder finalAnswerBuffer,
                              boolean useMemory, String conversationId, AgentState agentState,
