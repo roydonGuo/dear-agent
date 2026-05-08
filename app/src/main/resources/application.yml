@@ -36,6 +36,9 @@ spring:
       api-key: xxx
     ollama:
       base-url: http://127.0.0.1:11434
+      chat:
+        options:
+          model: deepseek-r1:7b
   datasource:
     url: jdbc:mysql://43.240.221.8:3306/dear-agent?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=GMT%2B8
     username: roydon

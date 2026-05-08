@@ -19,7 +19,23 @@
       "Bash(javap -classpath /c/Users/31330/.m2/repository/org/springframework/ai/spring-ai-model/1.1.0/spring-ai-model-1.1.0.jar org.springframework.ai.tool.definition.DefaultToolDefinition)",
       "Bash(javap -classpath /c/Users/31330/.m2/repository/org/springframework/ai/spring-ai-model/1.1.0/spring-ai-model-1.1.0.jar org.springframework.ai.chat.model.ToolContext)",
       "WebFetch(domain:spring-ai-community.github.io)",
-      "Bash(xargs -I{} basename {} .jar)"
+      "Bash(xargs -I{} basename {} .jar)",
+      "Bash(jar tf *)",
+      "Bash(grep -E \"\\\\.class$\")",
+      "Bash(unzip -l __TRACKED_VAR__/.m2/repository/org/springframework/ai/spring-ai-deepseek/1.1.0/spring-ai-deepseek-1.1.0.jar)",
+      "Bash(unzip -o spring-ai-deepseek-1.1.0.jar 'org/springframework/ai/deepseek/api/DeepSeekApi$ChatCompletionMessage.class' org/springframework/ai/deepseek/DeepSeekAssistantMessage.class 'org/springframework/ai/deepseek/api/DeepSeekApi$ChatCompletionMessage$ToolCall.class' -d /tmp/deepseek-classes)",
+      "Bash(javap -p -c '/tmp/deepseek-classes/org/springframework/ai/deepseek/api/DeepSeekApi$ChatCompletionMessage.class')",
+      "Bash(javap -p /tmp/deepseek-classes/org/springframework/ai/deepseek/DeepSeekAssistantMessage.class)",
+      "Bash(unzip -o spring-ai-deepseek-1.1.0.jar \"org/springframework/ai/deepseek/DeepSeekChatModel.class\" -d /tmp/deepseek-classes)",
+      "Bash(unzip -o spring-ai-deepseek-1.1.0.jar \"org/springframework/ai/deepseek/api/DeepSeekApi.class\" -d /tmp/deepseek-classes)",
+      "Bash(javap -p /tmp/deepseek-classes/org/springframework/ai/deepseek/api/DeepSeekApi.class)",
+      "Bash(javap -p -c -cp __TRACKED_VAR__/.m2/repository/org/springframework/ai/spring-ai-deepseek/1.1.0/spring-ai-deepseek-1.1.0.jar org.springframework.ai.deepseek.DeepSeekChatModel)",
+      "Bash(grep -A 50 'lambda$createRequest')",
+      "Bash(grep -A 150 'lambda$createRequest$18')",
+      "Bash(grep -A 100 'lambda$internalStream$5')",
+      "Bash(cmd.exe /c \"dir D:\\\\JetBrains\\\\JavaProjects\\\\dear-agent\\\\.mvn 2>nul\")",
+      "Bash(cmd.exe /c \"cd /d C:\\\\Users\\\\31330\\\\AppData\\\\Local\\\\JetBrains && dir /s /b mvn.cmd 2>nul\")",
+      "Bash(xargs -I{} jar tf {})"
     ]
   }
 }

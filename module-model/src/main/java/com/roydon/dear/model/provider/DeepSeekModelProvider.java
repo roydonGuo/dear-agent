@@ -1,17 +1,33 @@
 package com.roydon.dear.model.provider;
 
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONArray;
+import com.alibaba.fastjson2.JSONObject;
 import com.roydon.dear.session.entity.ModelConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.deepseek.DeepSeekChatModel;
 import org.springframework.ai.deepseek.DeepSeekChatOptions;
 import org.springframework.ai.deepseek.api.DeepSeekApi;
-import org.springframework.ai.openai.OpenAiChatModel;
-import org.springframework.ai.openai.OpenAiChatOptions;
-import org.springframework.ai.openai.api.OpenAiApi;
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.stereotype.Component;
+import org.springframework.web.reactive.function.client.WebClient;
+import reactor.netty.http.client.HttpClient;
 
+/**
+ * DeepSeek 模型提供商。
+ *
+ * <p>针对 deepseek-reasoner (R1) 模型的多轮工具调用场景，
+ * 通过 {@link ReasoningChatModelWrapper} + {@link DeepSeekReasoningExchangeFilter}
+ * 修复 Spring AI 1.1.0 丢失 reasoning_content 导致 400 错误的问题。</p>
+ */
 @Component
 public class DeepSeekModelProvider implements ModelProvider {
+
+    private static final Logger log = LoggerFactory.getLogger(DeepSeekModelProvider.class);
+
+    private final DeepSeekReasoningExchangeFilter reasoningFilter = new DeepSeekReasoningExchangeFilter();
 
     @Override
     public String getProviderName() {
@@ -25,11 +41,18 @@ public class DeepSeekModelProvider implements ModelProvider {
 
     @Override
     public ChatModel createChatModel(ModelConfig config) {
+        // 1. 构建带 reasoning_content 过滤器的 WebClient.Builder
+        WebClient.Builder webClientBuilder = WebClient.builder()
+                .filter(reasoningFilter);
+
+        // 2. 构建 DeepSeekApi
         DeepSeekApi deepSeekApi = DeepSeekApi.builder()
                 .baseUrl(config.getBaseUrl())
                 .apiKey(config.getApiKey())
+                .webClientBuilder(webClientBuilder)
                 .build();
 
+        // 3. 构建 DeepSeekChatOptions
         DeepSeekChatOptions.Builder optionsBuilder = DeepSeekChatOptions.builder()
                 .model(config.getModel());
 
@@ -43,9 +66,27 @@ public class DeepSeekModelProvider implements ModelProvider {
             optionsBuilder.topP(config.getTopP());
         }
 
-        return DeepSeekChatModel.builder()
+        // 4. 构建 DeepSeekChatModel 并用 ReasoningChatModelWrapper 包装
+        DeepSeekChatModel chatModel = DeepSeekChatModel.builder()
                 .deepSeekApi(deepSeekApi)
                 .defaultOptions(optionsBuilder.build())
+                .build();
+
+        log.info("DeepSeek 模型已初始化: model={}, reasoning_content 修复已启用", config.getModel());
+        return new ReasoningChatModelWrapper(chatModel);
+    }
+
+    // ===== 工具方法 =====
+
+    public static WebClient webClient() {
+        HttpClient httpClient = HttpClient.create()
+                .headers(headers -> headers
+                        .remove("Transfer-Encoding")
+                        .set("Connection", "close")
+                );
+
+        return WebClient.builder()
+                .clientConnector(new ReactorClientHttpConnector(httpClient))
                 .build();
     }
 
