@@ -10,6 +10,8 @@ public interface ModelProvider {
 
     String getProviderName();
 
+    String getProviderIcon();
+
     ChatModel createChatModel(ModelConfig config);
 
     default boolean supports(String provider) {

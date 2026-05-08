@@ -19,6 +19,11 @@ public class OllamaModelProvider implements ModelProvider {
     }
 
     @Override
+    public String getProviderIcon() {
+        return "icon-ollama";
+    }
+
+    @Override
     public ChatModel createChatModel(ModelConfig config) {
         OllamaApi ollamaApi = OllamaApi.builder()
                 .baseUrl(config.getBaseUrl())

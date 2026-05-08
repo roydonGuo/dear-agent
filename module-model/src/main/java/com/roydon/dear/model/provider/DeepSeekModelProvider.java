@@ -19,6 +19,11 @@ public class DeepSeekModelProvider implements ModelProvider {
     }
 
     @Override
+    public String getProviderIcon() {
+        return "icon-deepseek";
+    }
+
+    @Override
     public ChatModel createChatModel(ModelConfig config) {
         DeepSeekApi deepSeekApi = DeepSeekApi.builder()
                 .baseUrl(config.getBaseUrl())
@@ -42,5 +47,9 @@ public class DeepSeekModelProvider implements ModelProvider {
                 .deepSeekApi(deepSeekApi)
                 .defaultOptions(optionsBuilder.build())
                 .build();
+    }
+
+    public static void main(String[] args) {
+        System.out.println("System.getProperty(\"user.dir\") = " + System.getProperty("user.dir") + "/.skills");
     }
 }

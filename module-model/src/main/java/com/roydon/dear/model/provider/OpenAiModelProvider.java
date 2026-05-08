@@ -16,6 +16,11 @@ public class OpenAiModelProvider implements ModelProvider {
     }
 
     @Override
+    public String getProviderIcon() {
+        return "icon-openai";
+    }
+
+    @Override
     public ChatModel createChatModel(ModelConfig config) {
         OpenAiApi openAiApi = OpenAiApi.builder()
                 .apiKey(config.getApiKey())

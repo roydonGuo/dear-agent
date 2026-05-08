@@ -16,6 +16,11 @@ public class ZhiPuAiModelProvider implements ModelProvider {
     }
 
     @Override
+    public String getProviderIcon() {
+        return "icon-zhipuai";
+    }
+
+    @Override
     public ChatModel createChatModel(ModelConfig config) {
         ZhiPuAiApi zhiPuAiApi = ZhiPuAiApi.builder()
                 .apiKey(config.getApiKey())

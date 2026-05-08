@@ -19,6 +19,11 @@ public class MiniMaxModelProvider implements ModelProvider {
     }
 
     @Override
+    public String getProviderIcon() {
+        return "icon-minimax";
+    }
+
+    @Override
     public ChatModel createChatModel(ModelConfig config) {
         MiniMaxApi miniMaxApi;
         if (config.getBaseUrl() == null) {
