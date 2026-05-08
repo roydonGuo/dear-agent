@@ -34,9 +34,6 @@
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <!-- API Key -->
-        <dashscope.api.key>sk-cec420dff8b04f5f8aedf0d5e2c98a50</dashscope.api.key>
-        <deepseek.api.key>sk-c6cff043e0304c7c926aa2c7daeb763c</deepseek.api.key>
 
         <spring.ai.version>1.1.0</spring.ai.version>
         <spring.ai.alibaba.version>1.1.2.0</spring.ai.alibaba.version>

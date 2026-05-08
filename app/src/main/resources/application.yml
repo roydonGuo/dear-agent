@@ -15,7 +15,7 @@ spring:
       max-request-size: 50MB
   ai:
     openai:
-      api-key: @dashscope.api.key@
+      api-key: xxx
       base-url: https://dashscope.aliyuncs.com/compatible-mode/
       chat:
         options:
@@ -24,12 +24,12 @@ spring:
           maxTokens: 50000
       embedding:
         base-url: https://dashscope.aliyuncs.com/compatible-mode/
-        api-key: @dashscope.api.key@
+        api-key: xxx
         options:
           model: text-embedding-v4
           dimensions: 1024
     deepseek:
-      api-key: @deepseek.api.key@
+      api-key: xxx
     minimax:
       api-key: xxx
     zhipuai:
