@@ -10,6 +10,7 @@ import com.roydon.dear.session.entity.AiSession;
 import com.roydon.dear.session.service.AiSessionService;
 import com.roydon.dear.tool.McpToolManager;
 import io.swagger.v3.oas.annotations.Operation;
+import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.ai.chat.memory.ChatMemory;
@@ -81,7 +82,7 @@ public class AgentController {
                     AgentResponse.error("模型未配置：" + e.getMessage()),
                     AgentResponse.done("error"));
         } catch (Exception e) {
-            log.error("处理网页搜索请求时发生错误: ", e);
+            log.error("处理请求时发生错误: ", e);
             return Flux.just(
                     AgentResponse.error("服务异常：" + e.getMessage()),
                     AgentResponse.done("error"));
@@ -109,7 +110,7 @@ public class AgentController {
         String prompt;
         ToolCallback[] tools;
 //        if (webSearchEnabled) {
-        prompt = ReactAgentPrompts.getDearAgentPrompt();
+        prompt = ReactAgentPrompts.cozeSysPrompt();
         tools = mcpToolManager.getAllTools();
 //            log.info("初始化 Agent（联网模式），工具数量: {}", tools.length);
 //        } else {
@@ -117,6 +118,8 @@ public class AgentController {
 //            tools = mcpToolManager.getFileTools();
 //            log.info("初始化 Agent（离线文件操作模式），工具数量: {}", tools.length);
 //        }
+
+        // 初始化 ChatModel
 
         ChatModel chatModel = modelRegistry.getDefaultChatModel("chat");
 

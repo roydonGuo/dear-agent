@@ -28,19 +28,14 @@ spring:
         options:
           model: text-embedding-v4
           dimensions: 1024
-#      语音模型，提供 dashscope、ollama、openai等
-#      audio:
-#        speech:
-#          api-key: @dashscope.api.key@
-#          base-url: https://dashscope.aliyuncs.com/compatible-mode/
-#          options:
-#            model: cosyvoice-v3-flash
-#            voice: xiaoyuan
-#            response-format: mp3
-#            speed: 1.0
-#            sample-rate: 22050
-#            volume: 50
-#            rate: 1                     # 语速：0.5-2.0
+    deepseek:
+      api-key: @deepseek.api.key@
+    minimax:
+      api-key: xxx
+    zhipuai:
+      api-key: xxx
+    ollama:
+      base-url: http://127.0.0.1:11434
   datasource:
     url: jdbc:mysql://43.240.221.8:3306/dear-agent?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=GMT%2B8
     username: roydon

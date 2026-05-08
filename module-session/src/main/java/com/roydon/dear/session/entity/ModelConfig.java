@@ -21,7 +21,10 @@ public class ModelConfig {
     @TableField("label")
     private String label;
 
-    /** openai / dashscope / ollama */
+    /**
+     * openai / dashscope / ollama
+     *{@see }
+     */
     @TableField("provider")
     private String provider;
 
