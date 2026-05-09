@@ -29,10 +29,9 @@ public class ModelAdminController {
 
     @GetMapping("/config")
     @Operation(summary = "模型配置列表")
-    public BaseResult<List<ModelConfig>> list(@RequestParam(required = false) String category) {
-        List<ModelConfig> list = category != null
-                ? configService.listByCategory(category)
-                : configService.listAllOrdered();
+    public BaseResult<List<ModelConfig>> list(@RequestParam(required = false) String category,
+                                              @RequestParam(required = false) Boolean enabled) {
+        List<ModelConfig> list = configService.listAllOrdered(category, enabled);
         return BaseResult.newSuccess(list);
     }
 
@@ -51,7 +50,7 @@ public class ModelAdminController {
     @GetMapping("/config/{id}")
     @Operation(summary = "获取模型配置")
     public BaseResult<ModelConfig> detail(@PathVariable Long id) {
-        return BaseResult.newSuccess(configService.getById( id));
+        return BaseResult.newSuccess(configService.getById(id));
     }
 
     @PutMapping("/config/{id}")
@@ -107,14 +106,15 @@ public class ModelAdminController {
                         .collect(Collectors.toList()));
     }
 
-    public record ProviderVO(String name, String icon, Integer order) {}
+    public record ProviderVO(String name, String icon, Integer order) {
+    }
 
     private void validateProvider(ModelConfig cfg) {
         boolean supported = providers.stream().anyMatch(p -> p.supports(cfg.getProvider()));
         if (!supported) {
             throw new IllegalArgumentException(
                     "不支持的供应商: " + cfg.getProvider() + "，可用: "
-                    + providers.stream().map(ModelProvider::getProviderName).collect(Collectors.joining(", ")));
+                            + providers.stream().map(ModelProvider::getProviderName).collect(Collectors.joining(", ")));
         }
     }
 }

@@ -23,7 +23,6 @@ public class ModelConfig {
 
     /**
      * openai / dashscope / ollama
-     *{@see }
      */
     @TableField("provider")
     private String provider;
@@ -49,12 +48,17 @@ public class ModelConfig {
     @TableField("json_response")
     private Boolean jsonResponse;
 
-    /** chat / embedding / tts / image */
+    /**
+     * chat / embedding / tts / image
+     */
     @TableField("category")
     private String category;
 
     @TableField("enabled")
     private Boolean enabled;
+
+//    @TableField("default_model") todo
+//    private Boolean defaultModel;
 
     @TableField("sort_order")
     private Integer sortOrder;

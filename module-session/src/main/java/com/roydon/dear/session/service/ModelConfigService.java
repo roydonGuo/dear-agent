@@ -9,7 +9,7 @@ public interface ModelConfigService extends IService<ModelConfig> {
 
     ModelConfig getByName(String name);
 
-    List<ModelConfig> listAllOrdered();
+    List<ModelConfig> listAllOrdered(String category,Boolean enabled);
 
     List<ModelConfig> listEnabled();
 

@@ -5,9 +5,11 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.roydon.dear.session.entity.ModelConfig;
 import com.roydon.dear.session.mapper.ModelConfigMapper;
 import com.roydon.dear.session.service.ModelConfigService;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Objects;
 
 @Service
 public class ModelConfigServiceImpl extends ServiceImpl<ModelConfigMapper, ModelConfig> implements ModelConfigService {
@@ -20,8 +22,10 @@ public class ModelConfigServiceImpl extends ServiceImpl<ModelConfigMapper, Model
     }
 
     @Override
-    public List<ModelConfig> listAllOrdered() {
+    public List<ModelConfig> listAllOrdered(String category, Boolean enabled) {
         LambdaQueryWrapper<ModelConfig> wrapper = new LambdaQueryWrapper<ModelConfig>()
+                .eq(StringUtils.isNotBlank(category), ModelConfig::getCategory, category)
+                .eq(Objects.nonNull(enabled), ModelConfig::getEnabled, enabled)
                 .orderByAsc(ModelConfig::getSortOrder);
         return this.list(wrapper);
     }

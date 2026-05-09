@@ -52,8 +52,7 @@ public class SkillsTool {
     @PostConstruct
     public void init() {
         refresh();
-        log.info("SkillsTool 初始化完成 — 技能: {}, 可执行工具: {}",
-                skillRegistry.size(), executableCallbacks.size());
+        log.info("SkillsTool 初始化完成 — 技能: {}, 可执行工具: {}", skillRegistry.size(), executableCallbacks.size());
     }
 
     // ==================== 主 ToolCallback ====================
@@ -69,7 +68,8 @@ public class SkillsTool {
                         .name(TOOL_NAME)
                         .description(buildToolDescription())
                         .inputSchema("""
-                                {"type":"object","properties":{"command":{"type":"string","description":"Skill name to invoke"}},"required":["command"]}""")
+                                {"type":"object","properties":{"command":{"type":"string","description":"Skill name to invoke"}},"required":["command"]}
+                                """)
                         .build();
             }
 

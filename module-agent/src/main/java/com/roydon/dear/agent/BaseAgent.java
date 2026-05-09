@@ -36,7 +36,7 @@ public abstract class BaseAgent {
     protected AgentTaskManager taskManager;
     protected String agentType;
 
-    protected boolean enableRecommendations = true;
+    protected boolean enableRecommendations = false;
 
     protected long startTime;
     protected long firstResponseTime;
