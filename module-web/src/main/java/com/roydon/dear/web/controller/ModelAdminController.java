@@ -13,6 +13,7 @@ import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -28,8 +29,7 @@ public class ModelAdminController {
 
     @GetMapping("/config")
     @Operation(summary = "模型配置列表")
-    public BaseResult<List<ModelConfig>> list(
-            @RequestParam(required = false) String category) {
+    public BaseResult<List<ModelConfig>> list(@RequestParam(required = false) String category) {
         List<ModelConfig> list = category != null
                 ? configService.listByCategory(category)
                 : configService.listAllOrdered();
@@ -99,10 +99,15 @@ public class ModelAdminController {
 
     @GetMapping("/providers")
     @Operation(summary = "获取支持的供应商列表")
-    public BaseResult<List<String>> listProviders() {
+    public BaseResult<List<ProviderVO>> listProviders() {
         return BaseResult.newSuccess(
-                providers.stream().map(ModelProvider::getProviderName).collect(Collectors.toList()));
+                providers.stream()
+                        .map(p -> new ProviderVO(p.getProviderName(), p.getProviderIcon(), p.getProviderOrder()))
+                        .sorted(Comparator.comparingInt(ProviderVO::order))
+                        .collect(Collectors.toList()));
     }
+
+    public record ProviderVO(String name, String icon, Integer order) {}
 
     private void validateProvider(ModelConfig cfg) {
         boolean supported = providers.stream().anyMatch(p -> p.supports(cfg.getProvider()));

@@ -39,6 +39,8 @@ spring:
       chat:
         options:
           model: deepseek-r1:7b
+    anthropic:
+      api-key: xxx
   datasource:
     url: jdbc:mysql://43.240.221.8:3306/dear-agent?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=GMT%2B8
     username: roydon

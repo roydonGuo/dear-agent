@@ -1,4 +1,4 @@
-package com.roydon.dear.model.provider;
+package com.roydon.dear.model.provider.reasoning;
 
 import java.util.concurrent.ConcurrentLinkedDeque;
 

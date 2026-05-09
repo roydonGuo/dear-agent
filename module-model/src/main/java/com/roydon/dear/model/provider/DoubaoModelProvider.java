@@ -2,25 +2,22 @@ package com.roydon.dear.model.provider;
 
 import com.roydon.dear.session.entity.ModelConfig;
 import org.springframework.ai.chat.model.ChatModel;
-import org.springframework.ai.deepseek.DeepSeekChatModel;
-import org.springframework.ai.deepseek.DeepSeekChatOptions;
-import org.springframework.ai.deepseek.api.DeepSeekApi;
-import org.springframework.ai.ollama.OllamaChatModel;
-import org.springframework.ai.ollama.api.OllamaApi;
-import org.springframework.ai.ollama.api.OllamaChatOptions;
+import org.springframework.ai.openai.OpenAiChatModel;
+import org.springframework.ai.openai.OpenAiChatOptions;
+import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.stereotype.Component;
 
 @Component
-public class OllamaModelProvider implements ModelProvider {
+public class DoubaoModelProvider implements ModelProvider {
 
     @Override
     public String getProviderName() {
-        return "ollama";
+        return "doubao";
     }
 
     @Override
     public String getProviderIcon() {
-        return "icon-ollama";
+        return "icon-doubao";
     }
 
     /**
@@ -28,27 +25,31 @@ public class OllamaModelProvider implements ModelProvider {
      */
     @Override
     public Integer getProviderOrder() {
-        return 7;
+        return 5;
     }
 
     @Override
     public ChatModel createChatModel(ModelConfig config) {
-        OllamaApi ollamaApi = OllamaApi.builder()
+        OpenAiApi openAiApi = OpenAiApi.builder()
+                .apiKey(config.getApiKey())
                 .baseUrl(config.getBaseUrl())
                 .build();
 
-        OllamaChatOptions.Builder optionsBuilder = OllamaChatOptions.builder()
+        OpenAiChatOptions.Builder optionsBuilder = OpenAiChatOptions.builder()
                 .model(config.getModel());
 
         if (config.getTemperature() != null) {
             optionsBuilder.temperature(config.getTemperature());
         }
+        if (config.getMaxTokens() != null) {
+            optionsBuilder.maxTokens(config.getMaxTokens());
+        }
         if (config.getTopP() != null) {
             optionsBuilder.topP(config.getTopP());
         }
 
-        return OllamaChatModel.builder()
-                .ollamaApi(ollamaApi)
+        return OpenAiChatModel.builder()
+                .openAiApi(openAiApi)
                 .defaultOptions(optionsBuilder.build())
                 .build();
     }

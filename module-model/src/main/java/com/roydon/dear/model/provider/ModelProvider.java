@@ -8,9 +8,22 @@ import org.springframework.ai.chat.model.ChatModel;
  */
 public interface ModelProvider {
 
+    /**
+     * 模型供应商名称，用于前端显示。
+     */
     String getProviderName();
 
+    /**
+     * 模型供应商图标，用于前端显示。
+     */
     String getProviderIcon();
+
+    /**
+     * 模型供应商顺序，用于前端排序。
+     */
+    Integer getProviderOrder();
+
+//    String getProviderBaseUrl();
 
     ChatModel createChatModel(ModelConfig config);
 

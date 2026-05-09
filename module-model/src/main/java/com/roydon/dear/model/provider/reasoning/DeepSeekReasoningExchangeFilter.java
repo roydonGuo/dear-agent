@@ -1,4 +1,4 @@
-package com.roydon.dear.model.provider;
+package com.roydon.dear.model.provider.reasoning;
 
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONArray;

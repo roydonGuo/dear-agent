@@ -23,6 +23,14 @@ public class MiniMaxModelProvider implements ModelProvider {
         return "icon-minimax";
     }
 
+    /**
+     * 模型供应商顺序，用于前端排序。
+     */
+    @Override
+    public Integer getProviderOrder() {
+        return 8;
+    }
+
     @Override
     public ChatModel createChatModel(ModelConfig config) {
         MiniMaxApi miniMaxApi;

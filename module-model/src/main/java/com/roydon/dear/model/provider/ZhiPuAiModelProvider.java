@@ -20,6 +20,14 @@ public class ZhiPuAiModelProvider implements ModelProvider {
         return "icon-zhipuai";
     }
 
+    /**
+     * 模型供应商顺序，用于前端排序。
+     */
+    @Override
+    public Integer getProviderOrder() {
+        return 9;
+    }
+
     @Override
     public ChatModel createChatModel(ModelConfig config) {
         ZhiPuAiApi zhiPuAiApi = ZhiPuAiApi.builder()

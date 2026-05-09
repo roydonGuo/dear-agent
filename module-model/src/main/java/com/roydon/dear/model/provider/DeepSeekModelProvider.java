@@ -1,8 +1,7 @@
 package com.roydon.dear.model.provider;
 
-import com.alibaba.fastjson2.JSON;
-import com.alibaba.fastjson2.JSONArray;
-import com.alibaba.fastjson2.JSONObject;
+import com.roydon.dear.model.provider.reasoning.DeepSeekReasoningExchangeFilter;
+import com.roydon.dear.model.provider.reasoning.ReasoningChatModelWrapper;
 import com.roydon.dear.session.entity.ModelConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,6 +26,11 @@ public class DeepSeekModelProvider implements ModelProvider {
 
     private static final Logger log = LoggerFactory.getLogger(DeepSeekModelProvider.class);
 
+
+    public static final String BASE_URL = "https://api.deepseek.com";
+
+    public static final String MODEL_DEFAULT = "deepseek-chat";
+
     private final DeepSeekReasoningExchangeFilter reasoningFilter = new DeepSeekReasoningExchangeFilter();
 
     @Override
@@ -37,6 +41,14 @@ public class DeepSeekModelProvider implements ModelProvider {
     @Override
     public String getProviderIcon() {
         return "icon-deepseek";
+    }
+
+    /**
+     * 模型供应商顺序，用于前端排序。
+     */
+    @Override
+    public Integer getProviderOrder() {
+        return 4;
     }
 
     @Override

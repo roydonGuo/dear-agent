@@ -1,26 +1,27 @@
 package com.roydon.dear.model.provider;
 
 import com.roydon.dear.session.entity.ModelConfig;
+import org.springframework.ai.anthropic.AnthropicChatModel;
+import org.springframework.ai.anthropic.AnthropicChatOptions;
+import org.springframework.ai.anthropic.api.AnthropicApi;
 import org.springframework.ai.chat.model.ChatModel;
-import org.springframework.ai.deepseek.DeepSeekChatModel;
-import org.springframework.ai.deepseek.DeepSeekChatOptions;
-import org.springframework.ai.deepseek.api.DeepSeekApi;
-import org.springframework.ai.ollama.OllamaChatModel;
-import org.springframework.ai.ollama.api.OllamaApi;
-import org.springframework.ai.ollama.api.OllamaChatOptions;
+import org.springframework.ai.minimax.MiniMaxChatModel;
+import org.springframework.ai.minimax.MiniMaxChatOptions;
+import org.springframework.ai.minimax.api.MiniMaxApi;
+import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.stereotype.Component;
 
 @Component
-public class OllamaModelProvider implements ModelProvider {
+public class AnthropicModelProvider implements ModelProvider {
 
     @Override
     public String getProviderName() {
-        return "ollama";
+        return "anthropic";
     }
 
     @Override
     public String getProviderIcon() {
-        return "icon-ollama";
+        return "icon-anthropic";
     }
 
     /**
@@ -28,27 +29,31 @@ public class OllamaModelProvider implements ModelProvider {
      */
     @Override
     public Integer getProviderOrder() {
-        return 7;
+        return 2;
     }
 
     @Override
     public ChatModel createChatModel(ModelConfig config) {
-        OllamaApi ollamaApi = OllamaApi.builder()
+        AnthropicApi anthropicApi = AnthropicApi.builder()
+                .apiKey(config.getApiKey())
                 .baseUrl(config.getBaseUrl())
                 .build();
 
-        OllamaChatOptions.Builder optionsBuilder = OllamaChatOptions.builder()
+        AnthropicChatOptions.Builder optionsBuilder = AnthropicChatOptions.builder()
                 .model(config.getModel());
 
         if (config.getTemperature() != null) {
             optionsBuilder.temperature(config.getTemperature());
         }
+        if (config.getMaxTokens() != null) {
+            optionsBuilder.maxTokens(config.getMaxTokens());
+        }
         if (config.getTopP() != null) {
             optionsBuilder.topP(config.getTopP());
         }
 
-        return OllamaChatModel.builder()
-                .ollamaApi(ollamaApi)
+        return AnthropicChatModel.builder()
+                .anthropicApi(anthropicApi)
                 .defaultOptions(optionsBuilder.build())
                 .build();
     }
