@@ -36,6 +36,7 @@ public abstract class BaseAgent {
     protected AgentTaskManager taskManager;
     protected String agentType;
 
+    // todo 是否启用推荐
     protected boolean enableRecommendations = false;
 
     protected long startTime;

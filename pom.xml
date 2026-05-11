@@ -28,6 +28,8 @@
         <module>module-web</module>
         <module>module-knowledge</module>
         <module>module-starter</module>
+        <module>module-prompt</module>
+        <module>module-core</module>
     </modules>
 
     <properties>
@@ -109,6 +111,16 @@
             <dependency>
                 <groupId>com.roydon.dear</groupId>
                 <artifactId>module-knowledge</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.roydon.dear</groupId>
+                <artifactId>module-prompt</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.roydon.dear</groupId>
+                <artifactId>module-core</artifactId>
                 <version>${project.version}</version>
             </dependency>
         </dependencies>
