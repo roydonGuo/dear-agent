@@ -316,4 +316,16 @@ public final class ReactAgentPrompts {
                 4. 调用工具前，先回复你要调用什么工具
                 """.formatted(LocalDateTime.now());
     }
+
+    public static String getJoinSysPrompt() {
+        return """
+                # 时间
+                当前时间：%s
+                # 工具调用规范
+                1. 验证信息必要性：需要调用搜索工具来验证；
+                2. 工具调用必须只通过 ToolCall 字段输出
+                3. 本轮无工具调用时，必须输出最终答案
+                4. 调用工具前，先回复你要调用什么工具
+                """.formatted(LocalDateTime.now());
+    }
 }

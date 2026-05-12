@@ -3,8 +3,11 @@ package com.roydon.dear.web.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.roydon.dear.common.BaseResult;
+import com.roydon.dear.prompt.entity.AiPrompt;
+import com.roydon.dear.prompt.service.AiPromptService;
 import com.roydon.dear.session.entity.ChatConversation;
 import com.roydon.dear.session.entity.ChatMessage;
+import com.roydon.dear.session.req.SessionEditRequest;
 import com.roydon.dear.session.resp.MessageVO;
 import com.roydon.dear.session.resp.PageResult;
 import com.roydon.dear.session.resp.SessionDetailVO;
@@ -32,9 +35,10 @@ public class SessionController {
 
     private final ChatConversationService conversationService;
     private final ChatMessageService messageService;
+    private final AiPromptService promptService;
 
     @GetMapping("/{conversationId}")
-    @Operation(summary = "查询会话详情", description = "根据conversationId查询会话详情")
+    @Operation(summary = "查询会话的对话列表", description = "根据conversationId查询会话中的对话列表详情")
     public BaseResult<SessionDetailVO> getSession(@PathVariable String conversationId) {
         log.info("查询会话详情: conversationId={}", conversationId);
         try {
@@ -73,7 +77,16 @@ public class SessionController {
                                 .eq(ChatMessage::getConversationId, conv.getId())
                                 .eq(ChatMessage::getDelFlag, "0")
                                 .count().intValue();
-                        return SessionListVO.fromConversation(conv, count);
+                        SessionListVO vo = SessionListVO.fromConversation(conv, count);
+                        // 查询人设相关信息
+                        if (conv.getPromptId() != null) {
+                            AiPrompt prompt = promptService.getById(conv.getPromptId());
+                            if (prompt != null) {
+                                vo.setAvatar(prompt.getAvatar());
+                                vo.setSystemPrompt(prompt.getPrompt());
+                            }
+                        }
+                        return vo;
                     })
                     .collect(Collectors.toList());
 
@@ -136,4 +149,62 @@ public class SessionController {
         }
         return result;
     }
+
+    @GetMapping("/{conversationId}/info")
+    @Operation(summary = "查询会话基本信息", description = "根据conversationId查询会话基本信息，包含人设信息、消息条数等")
+    public BaseResult<SessionListVO> getSessionInfo(@PathVariable String conversationId) {
+        log.info("查询会话基本信息: conversationId={}", conversationId);
+        try {
+            ChatConversation conversation = conversationService.getBySessionId(conversationId);
+            if (conversation == null) return BaseResult.newError("会话不存在");
+
+            Integer count = messageService.lambdaQuery()
+                    .eq(ChatMessage::getConversationId, conversation.getId())
+                    .eq(ChatMessage::getDelFlag, "0")
+                    .count().intValue();
+
+            SessionListVO vo = SessionListVO.fromConversation(conversation, count);
+            if (conversation.getPromptId() != null) {
+                AiPrompt prompt = promptService.getById(conversation.getPromptId());
+                if (prompt != null) {
+                    vo.setAvatar(prompt.getAvatar());
+                    vo.setSystemPrompt(prompt.getPrompt());
+                }
+            }
+            return BaseResult.newSuccess(vo);
+        } catch (Exception e) {
+            log.error("查询会话基本信息失败: conversationId={}", conversationId, e);
+            return BaseResult.newError("查询会话基本信息失败: " + e.getMessage());
+        }
+    }
+
+    @PutMapping("/{conversationId}")
+    @Operation(summary = "编辑会话", description = "根据conversationId编辑会话，可修改title和promptId")
+    public BaseResult<String> editSession(@PathVariable String conversationId,
+                                           @RequestBody SessionEditRequest request) {
+        log.info("编辑会话: conversationId={}, request={}", conversationId, request);
+        try {
+            ChatConversation conversation = conversationService.getBySessionId(conversationId);
+            if (conversation == null) return BaseResult.newError("会话不存在");
+
+            if (request.getTitle() != null) {
+                conversation.setTitle(request.getTitle());
+            }
+            if (request.getPromptId() != null) {
+                // 校验人设是否存在
+                AiPrompt prompt = promptService.getById(request.getPromptId());
+                if (prompt == null) {
+                    return BaseResult.newError("人设不存在");
+                }
+                conversation.setPromptId(request.getPromptId());
+            }
+
+            conversationService.updateById(conversation);
+            return BaseResult.newSuccess("会话编辑成功");
+        } catch (Exception e) {
+            log.error("编辑会话失败: conversationId={}", conversationId, e);
+            return BaseResult.newError("编辑会话失败: " + e.getMessage());
+        }
+    }
+
 }

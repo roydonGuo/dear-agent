@@ -19,6 +19,9 @@ public class SessionListVO {
     private LocalDateTime updateTime;
     private String fileid;
     private String thinking;
+    // 人设相关
+    private String avatar;
+    private String systemPrompt;
 
     public static SessionListVO fromAiSession(AiSession session, Integer messageCount) {
         return SessionListVO.builder()

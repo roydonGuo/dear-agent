@@ -28,6 +28,11 @@ public class ChatConversation {
 
     private String systemMessage;
 
+    /**
+     * 人设id，关联 AiPrompt 的id
+     */
+    private Long promptId;
+
     private Double temperature;
 
     private Integer maxTokens;

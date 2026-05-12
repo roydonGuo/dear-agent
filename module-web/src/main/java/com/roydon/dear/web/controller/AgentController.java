@@ -3,9 +3,13 @@ package com.roydon.dear.web.controller;
 import com.roydon.dear.agent.DearAgent;
 import com.roydon.dear.common.AgentResponse;
 import com.roydon.dear.common.manager.AgentTaskManager;
+import com.roydon.dear.common.prompts.BaseAgentPrompts;
 import com.roydon.dear.common.prompts.ReactAgentPrompts;
 import com.roydon.dear.model.registry.ModelRegistry;
 import com.roydon.dear.model.tts.AgentVoiceStreamService;
+import com.roydon.dear.prompt.entity.AiPrompt;
+import com.roydon.dear.prompt.service.AiPromptService;
+import com.roydon.dear.session.entity.ChatConversation;
 import com.roydon.dear.session.entity.ChatMessage;
 import com.roydon.dear.session.service.ChatConversationService;
 import com.roydon.dear.session.service.ChatMessageService;
@@ -30,6 +34,7 @@ import reactor.core.publisher.Flux;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 @Slf4j
 @RestController
@@ -44,6 +49,9 @@ public class AgentController {
 
     @Autowired
     private ChatMessageService messageService;
+
+    @Autowired
+    private AiPromptService aiPromptService;
 
     @Autowired
     private AgentTaskManager taskManager;
@@ -111,9 +119,24 @@ public class AgentController {
     }
 
     private DearAgent initDearAgent(String conversationId, boolean webSearchEnabled) {
-        String prompt;
+        String systemPrompt;
         ToolCallback[] tools;
-        prompt = ReactAgentPrompts.cozeSysPrompt();
+        // 填充系统提示词
+        if (StringUtils.isNotBlank(conversationId)) {
+            ChatConversation chatConversation = conversationService.getBySessionId(conversationId);
+            Long promptId = chatConversation.getPromptId();
+            if (Objects.nonNull(promptId)) {
+                AiPrompt aiPrompt = aiPromptService.getById(promptId);
+                systemPrompt = aiPrompt.getPrompt();
+            } else {
+                systemPrompt = ReactAgentPrompts.cozeSysPrompt();
+            }
+        } else {
+            systemPrompt = ReactAgentPrompts.cozeSysPrompt();
+        }
+
+        // 给系统提示词拼接时间
+        systemPrompt = systemPrompt + ReactAgentPrompts.getJoinSysPrompt();
         tools = mcpToolManager.getAllTools();
 
         ChatModel chatModel = modelRegistry.getDefaultChatModel("chat");
@@ -124,7 +147,7 @@ public class AgentController {
                 .name("dear react")
                 .chatModel(chatModel)
                 .tools(tools)
-                .systemPrompt(prompt)
+                .systemPrompt(systemPrompt)
                 .conversationService(conversationService)
                 .messageService(messageService)
                 .taskManager(taskManager)
