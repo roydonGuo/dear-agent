@@ -42,6 +42,7 @@ public class ModelAdminController {
         cfg.setId(null);
         validateProvider(cfg);
         configService.save(cfg);
+        configService.evictListCache();
         // todo 保存后要将模型刷新到缓存
         registry.refresh(cfg.getId());
         return BaseResult.newSuccess(cfg);
@@ -60,6 +61,7 @@ public class ModelAdminController {
         cfg.setId(id);
         validateProvider(cfg);
         configService.updateById(cfg);
+        configService.evictListCache();
         registry.refresh(id);
         return BaseResult.newSuccess(cfg);
     }
@@ -74,6 +76,7 @@ public class ModelAdminController {
         }
         registry.remove(cfg.getName());
         configService.removeById(id);
+        configService.evictListCache();
         return BaseResult.newSuccess();
     }
 

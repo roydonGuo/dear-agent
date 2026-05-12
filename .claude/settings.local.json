@@ -35,7 +35,20 @@
       "Bash(grep -A 100 'lambda$internalStream$5')",
       "Bash(cmd.exe /c \"dir D:\\\\JetBrains\\\\JavaProjects\\\\dear-agent\\\\.mvn 2>nul\")",
       "Bash(cmd.exe /c \"cd /d C:\\\\Users\\\\31330\\\\AppData\\\\Local\\\\JetBrains && dir /s /b mvn.cmd 2>nul\")",
-      "Bash(xargs -I{} jar tf {})"
+      "Bash(xargs -I{} jar tf {})",
+      "Bash(mvn clean *)",
+      "Bash(where mvn *)",
+      "Read(//c//**)",
+      "Bash(ls /c/apache-maven*)",
+      "Bash(\"/c/Users/31330/.m2/wrapper/dists/apache-maven-3.9.11-bin/6mqf5t809d9geo83kj4ttckcbc/apache-maven-3.9.11/bin/mvn.cmd\" -f D:/JetBrains/JavaProjects/dear-agent/pom.xml clean compile -q)",
+      "Bash(mvn dependency:resolve -pl module-common -q)",
+      "Read(//d/JetBrains//**)",
+      "Read(//d/JetBrains/**)",
+      "Bash(whereis mvn *)",
+      "Read(//d//**)"
     ]
+  },
+  "enabledPlugins": {
+    "superpowers@claude-plugins-official": true
   }
 }

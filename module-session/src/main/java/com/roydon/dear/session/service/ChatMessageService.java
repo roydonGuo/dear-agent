@@ -17,4 +17,6 @@ public interface ChatMessageService extends IService<ChatMessage> {
                                      String thinking, String tools, String reference,
                                      String recommend, Long firstResponseTime,
                                      Long totalResponseTime);
+
+    void evictByConversationId(Long conversationId);
 }

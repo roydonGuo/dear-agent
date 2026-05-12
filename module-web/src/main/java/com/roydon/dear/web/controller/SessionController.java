@@ -1,5 +1,9 @@
 package com.roydon.dear.web.controller;
 
+import com.alicp.jetcache.anno.CacheInvalidate;
+import com.alicp.jetcache.anno.CacheRefresh;
+import com.alicp.jetcache.anno.CacheType;
+import com.alicp.jetcache.anno.Cached;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.roydon.dear.common.BaseResult;
@@ -24,6 +28,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -51,6 +56,13 @@ public class SessionController {
                     .conversationId(conversationId)
                     .messages(buildMessageVOs(messages))
                     .build();
+            if (conversation.getPromptId() != null) {
+                AiPrompt prompt = promptService.getById(conversation.getPromptId());
+                if (prompt != null) {
+                    detailVO.setAvatar(prompt.getAvatar());
+                    detailVO.setSystemPrompt(prompt.getPrompt());
+                }
+            }
             return BaseResult.newSuccess(detailVO);
         } catch (Exception e) {
             log.error("查询会话详情失败: conversationId={}", conversationId, e);
@@ -71,13 +83,9 @@ public class SessionController {
                     .orderByDesc(ChatConversation::getUpdateTime)
                     .page(page);
 
-            List<SessionListVO> sessionList = resultPage.getRecords().stream()
+            List<SessionListVO> sessionList = resultPage.getRecords().parallelStream()
                     .map(conv -> {
-                        Integer count = messageService.lambdaQuery()
-                                .eq(ChatMessage::getConversationId, conv.getId())
-                                .eq(ChatMessage::getDelFlag, "0")
-                                .count().intValue();
-                        SessionListVO vo = SessionListVO.fromConversation(conv, count);
+                        SessionListVO vo = SessionListVO.fromConversation(conv);
                         // 查询人设相关信息
                         if (conv.getPromptId() != null) {
                             AiPrompt prompt = promptService.getById(conv.getPromptId());
@@ -117,6 +125,9 @@ public class SessionController {
                     .eq(ChatMessage::getConversationId, conversation.getId())
                     .set(ChatMessage::getDelFlag, "1")
                     .update();
+
+            conversationService.evictBySessionId(conversationId);
+            messageService.evictByConversationId(conversation.getId());
 
             return BaseResult.newSuccess("会话删除成功");
         } catch (Exception e) {
@@ -158,12 +169,7 @@ public class SessionController {
             ChatConversation conversation = conversationService.getBySessionId(conversationId);
             if (conversation == null) return BaseResult.newError("会话不存在");
 
-            Integer count = messageService.lambdaQuery()
-                    .eq(ChatMessage::getConversationId, conversation.getId())
-                    .eq(ChatMessage::getDelFlag, "0")
-                    .count().intValue();
-
-            SessionListVO vo = SessionListVO.fromConversation(conversation, count);
+            SessionListVO vo = SessionListVO.fromConversation(conversation);
             if (conversation.getPromptId() != null) {
                 AiPrompt prompt = promptService.getById(conversation.getPromptId());
                 if (prompt != null) {
@@ -200,6 +206,7 @@ public class SessionController {
             }
 
             conversationService.updateById(conversation);
+            conversationService.evictBySessionId(conversationId);
             return BaseResult.newSuccess("会话编辑成功");
         } catch (Exception e) {
             log.error("编辑会话失败: conversationId={}", conversationId, e);

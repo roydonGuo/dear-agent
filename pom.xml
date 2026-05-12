@@ -45,6 +45,8 @@
         <mysql.version>8.0.33</mysql.version>
         <mybatis.version>3.5.5</mybatis.version>
         <redisson.version>3.24.3</redisson.version>
+        <caffeine.version>3.1.8</caffeine.version>
+        <jetcache.version>2.7.5</jetcache.version>
         <dashscope.sdk.version>2.22.16</dashscope.sdk.version>
         <spring.ai.alibaba.framework.version>1.1.2.0</spring.ai.alibaba.framework.version>
         <jsonschema-generator.version>4.37.0</jsonschema-generator.version>
@@ -58,6 +60,26 @@
                 <version>${spring.ai.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
+            </dependency>
+
+            <!-- Caffeine local cache -->
+            <dependency>
+                <groupId>com.github.ben-manes.caffeine</groupId>
+                <artifactId>caffeine</artifactId>
+                <version>${caffeine.version}</version>
+            </dependency>
+
+            <!-- JetCache with Redisson integration -->
+            <dependency>
+                <groupId>com.alicp.jetcache</groupId>
+                <artifactId>jetcache-starter-redisson</artifactId>
+                <version>${jetcache.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-starter-logging</artifactId>
+                    </exclusion>
+                </exclusions>
             </dependency>
             <dependency>
                 <groupId>com.alibaba.cloud.ai</groupId>

@@ -10,4 +10,6 @@ public interface ChatConversationService extends IService<ChatConversation> {
     ChatConversation getOrCreateBySessionId(String sessionId, String title);
 
     boolean updateLastMessage(Long conversationId, String lastMessage);
+
+    void evictBySessionId(String sessionId);
 }

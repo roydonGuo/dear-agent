@@ -14,4 +14,6 @@ public interface ModelConfigService extends IService<ModelConfig> {
     List<ModelConfig> listEnabled();
 
     List<ModelConfig> listByCategory(String category);
+
+    void evictListCache();
 }

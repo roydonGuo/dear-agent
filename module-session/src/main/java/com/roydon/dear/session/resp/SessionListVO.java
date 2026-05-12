@@ -14,7 +14,7 @@ public class SessionListVO {
     private String agentType;
     private String question;
     private String answer;
-    private Integer messageCount;
+//    private Integer messageCount;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
     private String fileid;
@@ -29,7 +29,6 @@ public class SessionListVO {
                 .agentType(session.getAgentType())
                 .question(session.getQuestion())
                 .answer(session.getAnswer())
-                .messageCount(messageCount)
                 .createTime(session.getCreateTime())
                 .updateTime(session.getUpdateTime())
                 .fileid(session.getFileid())
@@ -37,12 +36,11 @@ public class SessionListVO {
                 .build();
     }
 
-    public static SessionListVO fromConversation(ChatConversation conversation, Integer messageCount) {
+    public static SessionListVO fromConversation(ChatConversation conversation) {
         return SessionListVO.builder()
                 .conversationId(conversation.getSessionId())
                 .question(conversation.getTitle())
                 .answer(conversation.getLastMessage())
-                .messageCount(messageCount)
                 .createTime(conversation.getCreateTime())
                 .updateTime(conversation.getUpdateTime())
                 .build();

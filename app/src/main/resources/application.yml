@@ -8,6 +8,8 @@ server:
 spring:
 #  profiles:
 #    active: dev
+  application:
+    name: dear-agent
   servlet:
     multipart:
       enabled: true
@@ -59,6 +61,29 @@ spring:
       database: 23
       timeout: 5s
       password: roydon#Redis
+  redis:
+    redisson:
+      config: |
+        singleServerConfig:
+          idleConnectionTimeout: 10000
+          connectTimeout: 10000
+          timeout: 3000
+          retryAttempts: 3
+          retryInterval: 1500
+          password: roydon#Redis
+          subscriptionsPerConnection: 5
+          clientName: null
+          address: "redis://43.240.221.8:6379"
+          subscriptionConnectionMinimumIdleSize: 1
+          subscriptionConnectionPoolSize: 50
+          connectionMinimumIdleSize: 24
+          connectionPoolSize: 64
+          database: 23
+          dnsMonitoringInterval: 5000
+        threads: 16
+        nettyThreads: 32
+        codec: !<org.redisson.codec.JsonJacksonCodec> {}
+        transportMode: "NIO"
   mybatis-plus:
     mapper-locations: classpath:mapper/*.xml
 
@@ -74,6 +99,24 @@ minio:
 #tavily:
 #  api-key: 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
 #  mcp-url: https://mcp.tavily.com/mcp/
+
+jetcache:
+  statIntervalMinutes: 0
+  areaInCacheName: false
+  local:
+    default:
+      type: caffeine
+      keyConvertor: fastjson2
+      limit: 100
+  remote:
+    default:
+      type: redisson
+      keyConvertor: fastjson2
+      broadcastChannel: ${spring.application.name}
+      keyPrefix: ${spring.application.name}
+      valueEncoder: java
+      valueDecoder: java
+      defaultExpireInMillis: 5000
 
 logging:
   level:

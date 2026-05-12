@@ -5,11 +5,12 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
+import java.io.Serializable;
 import java.time.LocalDateTime;
 
 @Data
 @TableName("ai_chat_conversation")
-public class ChatConversation {
+public class ChatConversation implements Serializable {
 
     @TableId(type = IdType.AUTO)
     private Long id;

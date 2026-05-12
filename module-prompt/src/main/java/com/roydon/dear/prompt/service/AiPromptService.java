@@ -9,4 +9,6 @@ import java.util.List;
 public interface AiPromptService extends IService<AiPrompt> {
 
     IPage<AiPrompt> pageWithCategoryIds(IPage<AiPrompt> page, List<Long> categoryIds);
+
+    void evictById(Long id);
 }

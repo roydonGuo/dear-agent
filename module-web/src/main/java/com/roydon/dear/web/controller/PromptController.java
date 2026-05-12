@@ -127,6 +127,7 @@ public class PromptController {
         prompt.setPrompt(request.getPrompt());
         prompt.setCategoryIds(request.getCategoryIds());
         promptService.save(prompt);
+        promptService.evictById(prompt.getId());
         return BaseResult.newSuccess(prompt);
     }
 
@@ -154,6 +155,7 @@ public class PromptController {
         prompt.setPrompt(request.getPrompt());
         prompt.setCategoryIds(request.getCategoryIds());
         promptService.updateById(prompt);
+        promptService.evictById(id);
         return BaseResult.newSuccess(prompt);
     }
 
@@ -189,6 +191,7 @@ public class PromptController {
             return BaseResult.newError("人设不存在");
         }
         promptService.removeById(id);
+        promptService.evictById(id);
         return BaseResult.newSuccess();
     }
 }
