@@ -8,7 +8,7 @@ import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.stereotype.Component;
 
 @Component
-public class DashScopeModelProvider implements ModelProvider {
+public class DashscopeModelProvider implements ModelProvider {
 
     @Override
     public String getProviderName() {

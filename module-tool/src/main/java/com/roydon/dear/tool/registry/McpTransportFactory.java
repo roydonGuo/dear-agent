@@ -6,6 +6,7 @@ import com.alibaba.fastjson2.JSONObject;
 import com.roydon.dear.session.entity.McpServerConfig;
 import io.modelcontextprotocol.client.McpClient;
 import io.modelcontextprotocol.client.McpSyncClient;
+import io.modelcontextprotocol.client.transport.HttpClientSseClientTransport;
 import io.modelcontextprotocol.client.transport.HttpClientStreamableHttpTransport;
 import io.modelcontextprotocol.client.transport.ServerParameters;
 import io.modelcontextprotocol.client.transport.StdioClientTransport;
@@ -48,6 +49,20 @@ public class McpTransportFactory {
         return McpClient.sync(transport)
                 .requestTimeout(Duration.ofSeconds(cfg.getTimeoutSec() != null ? cfg.getTimeoutSec() : 300))
                 .build();
+
+//        HttpRequest.Builder requestBuilder = HttpRequest.newBuilder();
+//
+//        if (StringUtils.isNotBlank(cfg.getApiKey())) {
+//            requestBuilder.header("Authorization", "Bearer " + cfg.getApiKey());
+//        }
+//
+//        var transport = HttpClientSseClientTransport.builder(cfg.getMcpUrl())
+//                .requestBuilder(requestBuilder)
+//                .build();
+//
+//        return McpClient.sync(transport)
+//                .requestTimeout(Duration.ofSeconds(cfg.getTimeoutSec() != null ? cfg.getTimeoutSec() : 300))
+//                .build();
     }
 
     private McpSyncClient createStdioClient(McpServerConfig cfg) {

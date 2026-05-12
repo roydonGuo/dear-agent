@@ -77,16 +77,9 @@ minio:
 
 logging:
   level:
-    com:
-      roydon:
-        dear: debug
-    org:
-      springframework:
-        ai: debug
-    io:
-      modelcontextprotocol:
-        client: ERROR
-
+    com.roydon.dear: debug
+    org.springframework.ai: debug
+    io.modelcontextprotocol: debug
 
 #ai:
 #  tts:

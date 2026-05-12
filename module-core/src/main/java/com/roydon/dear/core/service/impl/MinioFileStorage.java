@@ -138,7 +138,8 @@ public class MinioFileStorage implements FileStorage {
                     .build());
         } catch (Exception e) {
             log.error("MinIO getUrl failed, bucket={}, key={}", bucket, key, e);
-            throw new RuntimeException("文件地址获取失败: " + e.getMessage());
+//            throw new RuntimeException("文件地址获取失败: " + e.getMessage());
+            return null;
         }
     }
 
