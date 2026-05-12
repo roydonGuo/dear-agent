@@ -1,5 +1,6 @@
 package com.roydon.dear.session.service.impl;
 
+import cn.hutool.extra.spring.SpringUtil;
 import com.alicp.jetcache.anno.CacheInvalidate;
 import com.alicp.jetcache.anno.CacheRefresh;
 import com.alicp.jetcache.anno.CacheType;
@@ -8,17 +9,19 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.roydon.dear.session.entity.ChatMessage;
 import com.roydon.dear.session.mapper.ChatMessageMapper;
 import com.roydon.dear.session.service.ChatMessageService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+@Slf4j
 @Service
 public class ChatMessageServiceImpl extends ServiceImpl<ChatMessageMapper, ChatMessage> implements ChatMessageService {
 
     @Override
-    @Cached(name = ":chatMessage:cache:", key = "#conversationId", cacheType = CacheType.BOTH, cacheNullValue = true ,  expire = 60, localExpire = 10, timeUnit = TimeUnit.MINUTES)
+    @Cached(name = ":chatMessage:cache:", key = "#conversationId", cacheType = CacheType.BOTH, cacheNullValue = true, expire = 60, localExpire = 10, timeUnit = TimeUnit.MINUTES)
     @CacheRefresh(refresh = 50, timeUnit = TimeUnit.MINUTES)
     public List<ChatMessage> findByConversationId(Long conversationId) {
         return lambdaQuery()
@@ -49,7 +52,7 @@ public class ChatMessageServiceImpl extends ServiceImpl<ChatMessageMapper, ChatM
         msg.setDelFlag("0");
         msg.setCreateTime(LocalDateTime.now());
         save(msg);
-        evictByConversationId(conversationId);
+        getSelf().evictByConversationId(conversationId);
         return msg;
     }
 
@@ -74,7 +77,7 @@ public class ChatMessageServiceImpl extends ServiceImpl<ChatMessageMapper, ChatM
         msg.setDelFlag("0");
         msg.setCreateTime(LocalDateTime.now());
         save(msg);
-        evictByConversationId(conversationId);
+        getSelf().evictByConversationId(conversationId);
         return msg;
     }
 
@@ -82,5 +85,11 @@ public class ChatMessageServiceImpl extends ServiceImpl<ChatMessageMapper, ChatM
     @CacheInvalidate(name = ":chatMessage:cache:", key = "#conversationId")
     public void evictByConversationId(Long conversationId) {
         // 仅触发缓存失效
+        log.debug("evictByConversationId[:chatMessage:cache:{}]", conversationId);
+    }
+
+    // 获取自身的bean，用于aop失效
+    private ChatMessageService getSelf() {
+        return SpringUtil.getBean(getClass());
     }
 }
