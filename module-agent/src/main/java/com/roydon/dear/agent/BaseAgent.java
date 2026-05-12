@@ -4,9 +4,9 @@ import com.alibaba.fastjson2.JSON;
 import com.roydon.dear.common.AgentResponse;
 import com.roydon.dear.common.manager.AgentTaskManager;
 import com.roydon.dear.common.prompts.ReactAgentPrompts;
-import com.roydon.dear.session.entity.AiSession;
-import com.roydon.dear.session.req.UpdateAnswerRequest;
-import com.roydon.dear.session.service.AiSessionService;
+import com.roydon.dear.session.entity.ChatMessage;
+import com.roydon.dear.session.service.ChatConversationService;
+import com.roydon.dear.session.service.ChatMessageService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.memory.ChatMemory;
@@ -32,17 +32,18 @@ public abstract class BaseAgent {
     protected final ChatModel chatModel;
     protected final String name;
     protected ChatMemory chatMemory;
-    protected AiSessionService sessionService;
+    protected ChatConversationService conversationService;
+    protected ChatMessageService messageService;
     protected AgentTaskManager taskManager;
     protected String agentType;
 
-    // todo 是否启用推荐
     protected boolean enableRecommendations = false;
 
     protected long startTime;
     protected long firstResponseTime;
     protected Set<String> usedTools;
-    protected Long currentSessionId;
+    protected Long currentConversationNumericId;
+    protected Long currentUserMessageId;
     protected String currentConversationId;
     protected String currentQuestion;
     protected String currentRecommendations;
@@ -78,17 +79,24 @@ public abstract class BaseAgent {
     }
 
     public ChatMemory createPersistentChatMemory(String sessionId, int maxMessages) {
-        if (sessionService == null) {
-            log.warn("sessionService is null, cannot load chat memory");
+        if (conversationService == null) {
+            log.warn("conversationService is null, cannot load chat memory");
             return MessageWindowChatMemory.builder().maxMessages(maxMessages).build();
         }
-        List<AiSession> history = sessionService.findRecentBySessionId(sessionId, maxMessages);
+        com.roydon.dear.session.entity.ChatConversation conversation = conversationService.getBySessionId(sessionId);
+        if (conversation == null) {
+            return MessageWindowChatMemory.builder().maxMessages(maxMessages).build();
+        }
+        List<ChatMessage> history = messageService.findRecentByConversationId(conversation.getId(), maxMessages * 2);
         ChatMemory chatMemory = MessageWindowChatMemory.builder().maxMessages(maxMessages).build();
         if (history != null && !history.isEmpty()) {
             for (int i = history.size() - 1; i >= 0; i--) {
-                AiSession record = history.get(i);
-                if (record.getQuestion() != null) chatMemory.add(sessionId, new UserMessage(record.getQuestion()));
-                if (record.getAnswer() != null) chatMemory.add(sessionId, new AssistantMessage(record.getAnswer()));
+                ChatMessage record = history.get(i);
+                if ("user".equals(record.getMessageType())) {
+                    chatMemory.add(sessionId, new UserMessage(record.getContent()));
+                } else if ("assistant".equals(record.getMessageType())) {
+                    chatMemory.add(sessionId, new AssistantMessage(record.getContent()));
+                }
             }
             log.debug("加载会话历史: sessionId={}, recordCount={}", sessionId, history.size());
         }
@@ -171,19 +179,12 @@ public abstract class BaseAgent {
         }
     }
 
-    protected boolean updateAnswer(UpdateAnswerRequest request) {
-        if (sessionService != null) {
-            boolean result = sessionService.updateAnswer(request);
-            if (result) log.debug("保存会话结果: sessionId={}, answerLength={}", request.getId(), request.getAnswer().length());
-            return result;
-        }
-        return false;
-    }
-
     public void setChatMemory(ChatMemory chatMemory) { this.chatMemory = chatMemory; }
-    public void setSessionService(AiSessionService sessionService) { this.sessionService = sessionService; }
+    public void setConversationService(ChatConversationService conversationService) { this.conversationService = conversationService; }
+    public void setMessageService(ChatMessageService messageService) { this.messageService = messageService; }
     public void setTaskManager(AgentTaskManager taskManager) { this.taskManager = taskManager; }
-    public Long getCurrentSessionId() { return currentSessionId; }
+    public Long getCurrentConversationNumericId() { return currentConversationNumericId; }
+    public Long getCurrentUserMessageId() { return currentUserMessageId; }
     public String getCurrentConversationId() { return currentConversationId; }
     public String getAgentType() { return agentType; }
     public void setEnableRecommendations(boolean enableRecommendations) { this.enableRecommendations = enableRecommendations; }

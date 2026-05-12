@@ -6,8 +6,9 @@ import com.roydon.dear.common.manager.AgentTaskManager;
 import com.roydon.dear.common.prompts.ReactAgentPrompts;
 import com.roydon.dear.model.registry.ModelRegistry;
 import com.roydon.dear.model.tts.AgentVoiceStreamService;
-import com.roydon.dear.session.entity.AiSession;
-import com.roydon.dear.session.service.AiSessionService;
+import com.roydon.dear.session.entity.ChatMessage;
+import com.roydon.dear.session.service.ChatConversationService;
+import com.roydon.dear.session.service.ChatMessageService;
 import com.roydon.dear.tool.McpToolManager;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.annotation.Resource;
@@ -39,7 +40,10 @@ public class AgentController {
     private ModelRegistry modelRegistry;
 
     @Autowired
-    private AiSessionService sessionService;
+    private ChatConversationService conversationService;
+
+    @Autowired
+    private ChatMessageService messageService;
 
     @Autowired
     private AgentTaskManager taskManager;
@@ -109,47 +113,32 @@ public class AgentController {
     private DearAgent initDearAgent(String conversationId, boolean webSearchEnabled) {
         String prompt;
         ToolCallback[] tools;
-//        if (webSearchEnabled) {
         prompt = ReactAgentPrompts.cozeSysPrompt();
         tools = mcpToolManager.getAllTools();
-//            log.info("初始化 Agent（联网模式），工具数量: {}", tools.length);
-//        } else {
-//            prompt = ReactAgentPrompts.getFileOperationPrompt();
-//            tools = mcpToolManager.getFileTools();
-//            log.info("初始化 Agent（离线文件操作模式），工具数量: {}", tools.length);
-//        }
-
-        // 初始化 ChatModel
 
         ChatModel chatModel = modelRegistry.getDefaultChatModel("chat");
+
+        // todo 根据不同类型切换不同agent
 
         DearAgent dearReact = DearAgent.builder()
                 .name("dear react")
                 .chatModel(chatModel)
                 .tools(tools)
                 .systemPrompt(prompt)
-                .sessionService(sessionService)
+                .conversationService(conversationService)
+                .messageService(messageService)
                 .taskManager(taskManager)
                 .maxRounds(5)
                 .build();
 
         if (StringUtils.isNotBlank(conversationId)) {
-            ChatMemory chatMemory = createPersistentChatMemory(conversationId, 30);
+            ChatMemory chatMemory = createPersistentChatMemory(30);
             dearReact.setChatMemory(chatMemory);
         }
         return dearReact;
     }
 
-    private ChatMemory createPersistentChatMemory(String sessionId, int maxMessages) {
-        List<AiSession> history = sessionService.findRecentBySessionId(sessionId, maxMessages);
-        ChatMemory chatMemory = MessageWindowChatMemory.builder().maxMessages(maxMessages).build();
-        if (history != null && !history.isEmpty()) {
-            for (int i = history.size() - 1; i >= 0; i--) {
-                AiSession record = history.get(i);
-                if (record.getQuestion() != null) chatMemory.add(sessionId, new UserMessage(record.getQuestion()));
-                if (record.getAnswer() != null) chatMemory.add(sessionId, new AssistantMessage(record.getAnswer()));
-            }
-        }
-        return chatMemory;
+    private ChatMemory createPersistentChatMemory(int maxMessages) {
+        return MessageWindowChatMemory.builder().maxMessages(maxMessages).build();
     }
 }

@@ -10,10 +10,9 @@ import com.roydon.dear.common.domain.agent.RoundState;
 import com.roydon.dear.common.domain.agent.SearchResult;
 import com.roydon.dear.common.manager.AgentTaskManager;
 import com.roydon.dear.common.prompts.ReactAgentPrompts;
-import com.roydon.dear.session.entity.AiSession;
-import com.roydon.dear.session.req.SaveQuestionRequest;
-import com.roydon.dear.session.req.UpdateAnswerRequest;
-import com.roydon.dear.session.service.AiSessionService;
+import com.roydon.dear.session.entity.ChatMessage;
+import com.roydon.dear.session.service.ChatConversationService;
+import com.roydon.dear.session.service.ChatMessageService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.ai.chat.client.ChatClient;
@@ -51,7 +50,8 @@ public class DearAgent extends BaseAgent {
 
     public DearAgent(String name, ChatModel chatModel, List<ToolCallback> tools, String systemPrompt, int maxRounds,
                      ChatMemory chatMemory, List<Advisor> advisors, int maxReflectionRounds,
-                     AiSessionService sessionService, AgentTaskManager taskManager) {
+                     ChatConversationService conversationService, ChatMessageService messageService,
+                     AgentTaskManager taskManager) {
         super(name, chatModel, "websearch");
         this.tools = tools;
         this.systemPrompt = systemPrompt;
@@ -59,7 +59,8 @@ public class DearAgent extends BaseAgent {
         this.advisors = advisors;
         this.maxReflectionRounds = maxReflectionRounds;
         this.chatMemory = chatMemory;
-        this.sessionService = sessionService;
+        this.conversationService = conversationService;
+        this.messageService = messageService;
         this.taskManager = taskManager;
         this.usedTools = new HashSet<>();
         initChatClient();
@@ -121,13 +122,12 @@ public class DearAgent extends BaseAgent {
         messages.add(new UserMessage("<question>" + question + "</question>"));
         currentQuestion = question;
 
-        if (sessionService != null) {
-            AiSession savedSession = sessionService.saveQuestion(
-                    SaveQuestionRequest.builder()
-                            .sessionId(conversationId)
-                            .question(question)
-                            .build());
-            currentSessionId = savedSession.getId();
+        if (conversationService != null && messageService != null) {
+            String title = question.length() > 32 ? question.substring(0, 32) : question;
+            com.roydon.dear.session.entity.ChatConversation conversation = conversationService.getOrCreateBySessionId(conversationId, title);
+            currentConversationNumericId = conversation.getId();
+            ChatMessage userMsg = messageService.saveUserMessage(conversation.getId(), question, null);
+            currentUserMessageId = userMsg.getId();
         }
 
         AtomicLong roundCounter = new AtomicLong(0);
@@ -143,6 +143,7 @@ public class DearAgent extends BaseAgent {
         scheduleRound(messages, sink, roundCounter, hasSentFinalResult, finalAnswerBuffer, useMemory, conversationId, agentState, thinkingBuffer, enableThinking);
 
         String finalConversationId = conversationId;
+        String finalConversationId1 = conversationId;
         return sink.asFlux()
                 .doOnNext(chunk -> {
                     recordFirstResponse();
@@ -161,26 +162,31 @@ public class DearAgent extends BaseAgent {
                     log.info("思考过程: {}", thinkingBuffer);
                     saveSessionResult(finalConversationId, finalAnswerBuffer, thinkingBuffer, agentState);
                     if (taskManager != null) taskManager.stopTask(finalConversationId);
+                    // todo 发送 done 消息
+//                    sink.tryEmitNext(createDoneResponse(finalConversationId1));
                 });
     }
 
     private void saveSessionResult(String conversationId, StringBuilder finalAnswerBuffer, StringBuilder thinkingBuffer, AgentState agentState) {
-        if (sessionService != null && currentSessionId != null && finalAnswerBuffer.length() > 0) {
+        if (conversationService != null && messageService != null && currentConversationNumericId != null
+                && currentUserMessageId != null && finalAnswerBuffer.length() > 0) {
             long totalResponseTime = getTotalResponseTime();
             String toolsStr = getUsedToolsString();
             String referenceJson = "";
             if (!agentState.searchResults.isEmpty()) referenceJson = createReferenceResponse(JSON.toJSONString(agentState.searchResults));
-            UpdateAnswerRequest request = UpdateAnswerRequest.builder()
-                    .id(currentSessionId)
-                    .answer(finalAnswerBuffer.toString())
-                    .thinking(thinkingBuffer.toString())
-                    .tools(toolsStr)
-                    .reference(referenceJson)
-                    .recommend(currentRecommendations)
-                    .firstResponseTime(firstResponseTime)
-                    .totalResponseTime(totalResponseTime)
-                    .build();
-            sessionService.updateAnswer(request);
+            messageService.saveAssistantMessage(
+                    currentConversationNumericId,
+                    currentUserMessageId,
+                    finalAnswerBuffer.toString(),
+                    thinkingBuffer.toString(),
+                    toolsStr,
+                    referenceJson,
+                    currentRecommendations,
+                    firstResponseTime,
+                    totalResponseTime);
+            String lastMsg = finalAnswerBuffer.length() > 64
+                    ? finalAnswerBuffer.substring(0, 64) : finalAnswerBuffer.toString();
+            conversationService.updateLastMessage(currentConversationNumericId, lastMsg);
             log.info("结果已保存到会话: sessionId={}", conversationId);
         }
     }
@@ -483,11 +489,13 @@ public class DearAgent extends BaseAgent {
         private int maxRounds;
         private List<Advisor> advisors;
         private ChatMemory chatMemory;
-        private AiSessionService sessionService;
+        private ChatConversationService conversationService;
+        private ChatMessageService messageService;
         private AgentTaskManager taskManager;
 
         public Builder chatMemory(ChatMemory chatMemory) { this.chatMemory = chatMemory; return this; }
-        public Builder sessionService(AiSessionService sessionService) { this.sessionService = sessionService; return this; }
+        public Builder conversationService(ChatConversationService conversationService) { this.conversationService = conversationService; return this; }
+        public Builder messageService(ChatMessageService messageService) { this.messageService = messageService; return this; }
         public Builder taskManager(AgentTaskManager taskManager) { this.taskManager = taskManager; return this; }
         public Builder name(String name) { this.name = name; return this; }
         public Builder chatModel(ChatModel chatModel) { this.chatModel = chatModel; return this; }
@@ -501,7 +509,7 @@ public class DearAgent extends BaseAgent {
 
         public DearAgent build() {
             if (chatModel == null) throw new IllegalArgumentException("chatModel 不能为空！");
-            return new DearAgent(name, chatModel, tools, systemPrompt, maxRounds, chatMemory, advisors, maxReflectionRounds, sessionService, taskManager);
+            return new DearAgent(name, chatModel, tools, systemPrompt, maxRounds, chatMemory, advisors, maxReflectionRounds, conversationService, messageService, taskManager);
         }
     }
 }

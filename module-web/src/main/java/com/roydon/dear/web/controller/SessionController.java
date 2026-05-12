@@ -1,24 +1,25 @@
 package com.roydon.dear.web.controller;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.roydon.dear.common.BaseResult;
-import com.roydon.dear.session.entity.AiSession;
-import com.roydon.dear.session.mapper.AiSessionMapper;
+import com.roydon.dear.session.entity.ChatConversation;
+import com.roydon.dear.session.entity.ChatMessage;
 import com.roydon.dear.session.resp.MessageVO;
 import com.roydon.dear.session.resp.PageResult;
 import com.roydon.dear.session.resp.SessionDetailVO;
 import com.roydon.dear.session.resp.SessionListVO;
-import com.roydon.dear.session.service.AiSessionService;
+import com.roydon.dear.session.service.ChatConversationService;
+import com.roydon.dear.session.service.ChatMessageService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -26,31 +27,25 @@ import java.util.stream.Collectors;
 @Tag(name = "会话管理", description = "会话查询、列表、删除等接口")
 @RestController
 @RequestMapping("/session")
+@RequiredArgsConstructor
 public class SessionController {
 
-    @Autowired
-    private AiSessionService aiSessionService;
-
-    @Autowired
-    private AiSessionMapper aiSessionMapper;
+    private final ChatConversationService conversationService;
+    private final ChatMessageService messageService;
 
     @GetMapping("/{conversationId}")
     @Operation(summary = "查询会话详情", description = "根据conversationId查询会话详情")
     public BaseResult<SessionDetailVO> getSession(@PathVariable String conversationId) {
         log.info("查询会话详情: conversationId={}", conversationId);
         try {
-            LambdaQueryWrapper<AiSession> sessionQuery = new LambdaQueryWrapper<AiSession>()
-                    .eq(AiSession::getSessionId, conversationId)
-                    .orderByAsc(AiSession::getCreateTime);
-            List<AiSession> sessions = aiSessionService.list(sessionQuery);
-            if (sessions.isEmpty()) return BaseResult.newError("会话不存在");
+            ChatConversation conversation = conversationService.getBySessionId(conversationId);
+            if (conversation == null) return BaseResult.newError("会话不存在");
 
-            String agentType = sessions.get(0).getAgentType();
+            List<ChatMessage> messages = messageService.findByConversationId(conversation.getId());
+
             SessionDetailVO detailVO = SessionDetailVO.builder()
                     .conversationId(conversationId)
-                    .agentType(agentType)
-                    .fileid(sessions.get(0).getFileid())
-                    .messages(sessions.stream().map(this::convertToMessageVO).collect(Collectors.toList()))
+                    .messages(buildMessageVOs(messages))
                     .build();
             return BaseResult.newSuccess(detailVO);
         } catch (Exception e) {
@@ -66,11 +61,22 @@ public class SessionController {
             @Parameter(description = "页大小，默认10") @RequestParam(defaultValue = "10") Integer pageSize) {
         log.info("查询会话列表: pageNum={}, pageSize={}", pageNum, pageSize);
         try {
-            Page<AiSession> page = new Page<>(pageNum, pageSize);
-            IPage<AiSession> resultPage = aiSessionMapper.selectSessionListWithFirstRecord(page);
+            Page<ChatConversation> page = new Page<>(pageNum, pageSize);
+            IPage<ChatConversation> resultPage = conversationService.lambdaQuery()
+                    .eq(ChatConversation::getDelFlag, "0")
+                    .orderByDesc(ChatConversation::getUpdateTime)
+                    .page(page);
+
             List<SessionListVO> sessionList = resultPage.getRecords().stream()
-                    .map(session -> SessionListVO.fromAiSession(session, null))
+                    .map(conv -> {
+                        Integer count = messageService.lambdaQuery()
+                                .eq(ChatMessage::getConversationId, conv.getId())
+                                .eq(ChatMessage::getDelFlag, "0")
+                                .count().intValue();
+                        return SessionListVO.fromConversation(conv, count);
+                    })
                     .collect(Collectors.toList());
+
             PageResult<SessionListVO> pageResult = PageResult.<SessionListVO>builder()
                     .pageNum(pageNum).pageSize(pageSize).total(resultPage.getTotal()).records(sessionList).build();
             return BaseResult.newSuccess(pageResult);
@@ -86,14 +92,19 @@ public class SessionController {
     public BaseResult<String> deleteSession(@PathVariable String conversationId) {
         log.info("删除会话: conversationId={}", conversationId);
         try {
-            LambdaQueryWrapper<AiSession> sessionQuery = new LambdaQueryWrapper<AiSession>()
-                    .eq(AiSession::getSessionId, conversationId).last("LIMIT 1");
-            AiSession session = aiSessionService.getOne(sessionQuery);
-            if (session == null) return BaseResult.newError("会话不存在");
+            ChatConversation conversation = conversationService.getBySessionId(conversationId);
+            if (conversation == null) return BaseResult.newError("会话不存在");
 
-            LambdaQueryWrapper<AiSession> deleteQuery = new LambdaQueryWrapper<AiSession>()
-                    .eq(AiSession::getSessionId, conversationId);
-            aiSessionService.remove(deleteQuery);
+            conversationService.lambdaUpdate()
+                    .eq(ChatConversation::getId, conversation.getId())
+                    .set(ChatConversation::getDelFlag, "1")
+                    .update();
+
+            messageService.lambdaUpdate()
+                    .eq(ChatMessage::getConversationId, conversation.getId())
+                    .set(ChatMessage::getDelFlag, "1")
+                    .update();
+
             return BaseResult.newSuccess("会话删除成功");
         } catch (Exception e) {
             log.error("删除会话失败: conversationId={}", conversationId, e);
@@ -101,11 +112,28 @@ public class SessionController {
         }
     }
 
-    private MessageVO convertToMessageVO(AiSession session) {
-        return MessageVO.builder()
-                .id(session.getId()).question(session.getQuestion()).answer(session.getAnswer())
-                .thinking(session.getThinking()).tools(session.getTools()).reference(session.getReference())
-                .createTime(session.getCreateTime()).fileid(session.getFileid()).recommend(session.getRecommend())
-                .build();
+    private List<MessageVO> buildMessageVOs(List<ChatMessage> messages) {
+        List<MessageVO> result = new ArrayList<>();
+        MessageVO current = null;
+        for (ChatMessage msg : messages) {
+            if ("user".equals(msg.getMessageType())) {
+                current = MessageVO.builder()
+                        .id(msg.getId())
+                        .question(msg.getContent())
+                        .createTime(msg.getCreateTime())
+                        .fileid(msg.getFileid())
+                        .build();
+                result.add(current);
+            } else if ("assistant".equals(msg.getMessageType())) {
+                if (current != null) {
+                    current.setAnswer(msg.getContent());
+                    current.setThinking(msg.getThinking());
+                    current.setTools(msg.getTools());
+                    current.setReference(msg.getReference());
+                    current.setRecommend(msg.getRecommend());
+                }
+            }
+        }
+        return result;
     }
 }

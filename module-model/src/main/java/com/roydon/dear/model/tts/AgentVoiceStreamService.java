@@ -26,7 +26,7 @@ import java.util.concurrent.atomic.AtomicReference;
 public class AgentVoiceStreamService {
 
     private static final int MAX_TTS_TEXT_LENGTH = 512;
-    private static final int MIN_TTS_CHUNK_LENGTH = 200;
+    private static final int MIN_TTS_CHUNK_LENGTH = 128;
 
     private final AlibabaTtsService ttsService;
 
