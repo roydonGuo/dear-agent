@@ -45,7 +45,9 @@
       "Read(//d/JetBrains//**)",
       "Read(//d/JetBrains/**)",
       "Bash(whereis mvn *)",
-      "Read(//d//**)"
+      "Read(//d//**)",
+      "Bash(export JAVA_HOME=\"D:\\\\Java\\\\jdk-21.0.4\")",
+      "Bash(export PATH=\"/d/JetBrains/IntelliJ IDEA 2024.1.4/plugins/maven/lib/maven3/bin:$PATH\")"
     ]
   },
   "enabledPlugins": {

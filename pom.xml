@@ -50,6 +50,7 @@
         <dashscope.sdk.version>2.22.16</dashscope.sdk.version>
         <spring.ai.alibaba.framework.version>1.1.2.0</spring.ai.alibaba.framework.version>
         <jsonschema-generator.version>4.37.0</jsonschema-generator.version>
+        <mapstruct.version>1.5.5.Final</mapstruct.version>
     </properties>
 
     <dependencyManagement>
@@ -144,6 +145,18 @@
                 <groupId>com.roydon.dear</groupId>
                 <artifactId>module-core</artifactId>
                 <version>${project.version}</version>
+            </dependency>
+
+            <!-- MapStruct -->
+            <dependency>
+                <groupId>org.mapstruct</groupId>
+                <artifactId>mapstruct</artifactId>
+                <version>${mapstruct.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.mapstruct</groupId>
+                <artifactId>mapstruct-processor</artifactId>
+                <version>${mapstruct.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

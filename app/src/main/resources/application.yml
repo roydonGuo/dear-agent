@@ -88,11 +88,11 @@ spring:
     mapper-locations: classpath:mapper/*.xml
 
 minio:
-  url: http://127.0.0.1:9000/
+  url: http://43.240.221.8:9000/
   accessKey: roydon
   secretKey: roydon#Minio
   bucketName: dear-agent
-  endpoint: http://127.0.0.1:9000/
+  endpoint: http://43.240.221.8:9000/
 
 
 # Tavily 搜索引擎配置
