@@ -1,7 +1,10 @@
 package com.roydon.dear.common;
 
+import lombok.Data;
+
 import java.io.Serializable;
 
+@Data
 public class BaseResult<T> implements Serializable {
 
     private T data;
@@ -87,21 +90,16 @@ public class BaseResult<T> implements Serializable {
         return new BaseResult<>(code, message, null);
     }
 
-    public String getMessage() { return message; }
-    public void setMessage(String message) { this.message = message; }
-    public T getData() { return data; }
-    public void setData(T data) { this.data = data; }
-    public int getCode() { return code; }
-    public void setCode(int code) { this.code = code; }
-
     public static final Integer CODE_SUCCESS = 200;
     public static final Integer CODE_SUCCESS_TIP = 220;
     public static final Integer CODE_SUCCESS_WARN = 230;
     public static final Integer CODE_SUCCESS_ERR = 240;
+
     public static final Integer CODE_NO_LOGIN = 401;
     public static final Integer CODE_FORBIDDEN = 403;
     public static final Integer CODE_NOT_ALLOWED = 405;
     public static final Integer CODE_NO_REG_SYS = 420;
     public static final Integer CODE_NO_REG_MODULE = 421;
+
     public static final Integer CODE_SERVER_ERROR = 500;
 }

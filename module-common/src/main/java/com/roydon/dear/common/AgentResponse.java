@@ -2,7 +2,9 @@ package com.roydon.dear.common;
 
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
+import lombok.Data;
 
+@Data
 public class AgentResponse {
 
     public static final String TYPE_TEXT = "text";
@@ -107,13 +109,4 @@ public class AgentResponse {
         }
         return obj.toJSONString();
     }
-
-    public String getType() { return type; }
-    public void setType(String type) { this.type = type; }
-    public String getContent() { return content; }
-    public void setContent(String content) { this.content = content; }
-    public Integer getCount() { return count; }
-    public void setCount(Integer count) { this.count = count; }
-    public Object getData() { return data; }
-    public void setData(Object data) { this.data = data; }
 }

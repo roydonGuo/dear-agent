@@ -3,25 +3,19 @@ package com.roydon.dear.web.controller;
 import com.roydon.dear.agent.DearAgent;
 import com.roydon.dear.common.AgentResponse;
 import com.roydon.dear.common.manager.AgentTaskManager;
-import com.roydon.dear.common.prompts.BaseAgentPrompts;
 import com.roydon.dear.common.prompts.ReactAgentPrompts;
 import com.roydon.dear.model.registry.ModelRegistry;
 import com.roydon.dear.model.tts.AgentVoiceStreamService;
 import com.roydon.dear.prompt.entity.AiPrompt;
 import com.roydon.dear.prompt.service.AiPromptService;
 import com.roydon.dear.session.entity.ChatConversation;
-import com.roydon.dear.session.entity.ChatMessage;
 import com.roydon.dear.session.service.ChatConversationService;
 import com.roydon.dear.session.service.ChatMessageService;
 import com.roydon.dear.tool.McpToolManager;
 import io.swagger.v3.oas.annotations.Operation;
-import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.ai.chat.memory.ChatMemory;
-import org.springframework.ai.chat.memory.MessageWindowChatMemory;
-import org.springframework.ai.chat.messages.AssistantMessage;
-import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,7 +26,6 @@ import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -155,13 +148,11 @@ public class AgentController {
                 .build();
 
         if (StringUtils.isNotBlank(conversationId)) {
-            ChatMemory chatMemory = createPersistentChatMemory(30);
+            ChatMemory chatMemory = dearReact.createPersistentChatMemory(conversationId, 30);
             dearReact.setChatMemory(chatMemory);
         }
         return dearReact;
     }
 
-    private ChatMemory createPersistentChatMemory(int maxMessages) {
-        return MessageWindowChatMemory.builder().maxMessages(maxMessages).build();
-    }
+
 }
