@@ -56,7 +56,7 @@ public class ChatConversationServiceImpl extends ServiceImpl<ChatConversationMap
     }
 
     @Override
-    @CacheInvalidate(name = ":conversation:cache:", key = "#sessionId")
+    @CacheInvalidate(name = ":chatConversation:cache:", key = "#sessionId")
     public void evictBySessionId(String sessionId) {
         // 仅触发缓存失效
     }

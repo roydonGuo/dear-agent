@@ -47,7 +47,15 @@
       "Bash(whereis mvn *)",
       "Read(//d//**)",
       "Bash(export JAVA_HOME=\"D:\\\\Java\\\\jdk-21.0.4\")",
-      "Bash(export PATH=\"/d/JetBrains/IntelliJ IDEA 2024.1.4/plugins/maven/lib/maven3/bin:$PATH\")"
+      "Bash(export PATH=\"/d/JetBrains/IntelliJ IDEA 2024.1.4/plugins/maven/lib/maven3/bin:$PATH\")",
+      "Bash(./mvnw clean *)",
+      "Bash(./gradlew)",
+      "Bash(where.exe mvn *)",
+      "Bash(cmd //c \"where mvn\")",
+      "Bash(cmd //c \"mvn -version\")",
+      "Bash(export JAVA_HOME=\"/d/JetBrains/IntelliJ IDEA 2024.1.4/jbr\")",
+      "Bash(\"/d/JetBrains/IntelliJ IDEA 2024.1.4/plugins/maven/lib/maven3/bin/mvn\" clean compile -pl module-knowledge,module-web -am -q)",
+      "Bash(\"/d/JetBrains/IntelliJ IDEA 2024.1.4/plugins/maven/lib/maven3/bin/mvn\" compile -pl module-knowledge,module-web -am)"
     ]
   },
   "enabledPlugins": {

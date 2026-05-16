@@ -1,9 +1,5 @@
 package com.roydon.dear.web.controller;
 
-import com.alicp.jetcache.anno.CacheInvalidate;
-import com.alicp.jetcache.anno.CacheRefresh;
-import com.alicp.jetcache.anno.CacheType;
-import com.alicp.jetcache.anno.Cached;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.roydon.dear.common.BaseResult;
@@ -28,7 +24,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -187,7 +182,7 @@ public class SessionController {
     @PutMapping("/{conversationId}")
     @Operation(summary = "编辑会话", description = "根据conversationId编辑会话，可修改title和promptId")
     public BaseResult<String> editSession(@PathVariable String conversationId,
-                                           @RequestBody SessionEditRequest request) {
+                                          @RequestBody SessionEditRequest request) {
         log.info("编辑会话: conversationId={}, request={}", conversationId, request);
         try {
             ChatConversation conversation = conversationService.getBySessionId(conversationId);
