@@ -20,7 +20,7 @@ public class KnowledgeFileRequest {
 
     private Long parentId;
 
-    @Size(max = 20, message = "名称最长20个字符")
+    @Size(max = 50, message = "名称最长50个字符")
     private String name;
 
     @NotBlank(message = "类型不能为空")

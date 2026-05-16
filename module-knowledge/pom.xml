@@ -43,6 +43,10 @@
         </dependency>
         <dependency>
             <groupId>com.roydon.dear</groupId>
+            <artifactId>module-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.roydon.dear</groupId>
             <artifactId>module-model</artifactId>
         </dependency>
 

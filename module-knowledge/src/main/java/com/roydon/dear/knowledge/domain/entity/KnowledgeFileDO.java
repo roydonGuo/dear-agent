@@ -37,6 +37,12 @@ public class KnowledgeFileDO implements Serializable {
     @TableField("content")
     private String content;
 
+    @TableField("storage_path")
+    private String storagePath;
+
+    @TableField("file_size")
+    private Long fileSize;
+
     @TableField("create_time")
     private LocalDateTime createTime;
 

@@ -20,7 +20,7 @@ public class GlobalExceptionHandler {
                 .map(f -> f.getField() + ": " + f.getDefaultMessage())
                 .collect(Collectors.joining("; "));
         log.warn("参数校验失败: {}", msg);
-        return BaseResult.fail(400, msg);
+        return BaseResult.fail(500, msg);
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
@@ -29,7 +29,7 @@ public class GlobalExceptionHandler {
                 .map(v -> v.getPropertyPath() + ": " + v.getMessage())
                 .collect(Collectors.joining("; "));
         log.warn("参数校验失败: {}", msg);
-        return BaseResult.fail(400, msg);
+        return BaseResult.fail(500, msg);
     }
 
     @ExceptionHandler(BusinessException.class)

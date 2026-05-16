@@ -58,6 +58,11 @@ public interface FileStorage {
     void delete(String bucket, String key);
 
     /**
+     * 获取默认存储桶名称
+     */
+    String getDefaultBucket();
+
+    /**
      * 获取文件访问 URL
      *
      * @param bucket 存储桶

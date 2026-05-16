@@ -256,6 +256,7 @@ public class DearAgent extends BaseAgent {
                              boolean useMemory, String conversationId, AgentState agentState,
                              StringBuilder thinkingBuffer, boolean enableThinking) {
         if (state.getMode() != RoundMode.TOOL_CALL) {
+            log.debug("结束轮次: round={}, mode={}, text={}", roundCounter.get(), state.getMode(), state.textBuffer.toString());
             String referenceJson = "";
             String finalText = state.textBuffer.toString();
 
@@ -363,13 +364,13 @@ public class DearAgent extends BaseAgent {
                     return;
                 }
                 // todo 当触发搜索tool，emit
-//                if (toolName.contains("search")) {
-//                    JSONObject args = JSON.parseObject(argsJson);
-//                    String query = (String) args.get("query");
-//                    String queryThink = StringUtils.isNotBlank(query) ? "🔍 正在搜索信息: " + query + "\n" : "🔍 正在搜索相关信息\n";
-//                    thinkingBuffer.append(queryThink);
-//                    if (enableThinking) sink.tryEmitNext(createThinkingResponse(queryThink));
-//                }
+                if (toolName.contains("search")) {
+                    JSONObject args = JSON.parseObject(argsJson);
+                    String query = (String) args.get("query");
+                    String queryThink = StringUtils.isNotBlank(query) ? "🔍 正在搜索信息: " + query + "\n" : "🔍 正在搜索相关信息\n";
+                    thinkingBuffer.append(queryThink);
+                    if (enableThinking) sink.tryEmitNext(createReferenceResponse(queryThink));
+                }
 
                 try {
                     Object result = callback.call(argsJson);

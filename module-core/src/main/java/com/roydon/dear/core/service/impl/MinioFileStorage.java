@@ -116,6 +116,11 @@ public class MinioFileStorage implements FileStorage {
     }
 
     @Override
+    public String getDefaultBucket() {
+        return defaultBucket;
+    }
+
+    @Override
     public void delete(String bucket, String key) {
         try {
             minioClient.removeObject(RemoveObjectArgs.builder()

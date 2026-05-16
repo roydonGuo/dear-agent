@@ -30,6 +30,12 @@ public class KnowledgeFileResp implements Serializable {
 
     private String content;
 
+    private String storagePath;
+
+    private Long fileSize;
+
+    private String fileUrl;
+
     private LocalDateTime createTime;
 
     private LocalDateTime updateTime;
