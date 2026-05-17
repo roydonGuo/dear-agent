@@ -211,7 +211,7 @@ public class AgentTaskManager implements InitializingBean, DisposableBean {
     private String createStopMessage() {
         JSONObject obj = new JSONObject();
         obj.put("type", "text");
-        obj.put("content", "⏹ 用户已停止生成\n");
+        obj.put("content", "\n⏹ 用户已停止生成\n");
         return JSON.toJSONString(obj);
     }
 }
