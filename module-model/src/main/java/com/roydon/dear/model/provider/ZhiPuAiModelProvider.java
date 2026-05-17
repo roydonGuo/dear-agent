@@ -1,9 +1,14 @@
 package com.roydon.dear.model.provider;
 
+import cn.hutool.core.util.StrUtil;
 import com.roydon.dear.session.entity.ModelConfig;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.document.MetadataMode;
+import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.zhipuai.ZhiPuAiChatModel;
 import org.springframework.ai.zhipuai.ZhiPuAiChatOptions;
+import org.springframework.ai.zhipuai.ZhiPuAiEmbeddingModel;
+import org.springframework.ai.zhipuai.ZhiPuAiEmbeddingOptions;
 import org.springframework.ai.zhipuai.api.ZhiPuAiApi;
 import org.springframework.stereotype.Component;
 
@@ -49,5 +54,17 @@ public class ZhiPuAiModelProvider implements ModelProvider {
         }
 
         return new ZhiPuAiChatModel(zhiPuAiApi, optionsBuilder.build());
+    }
+
+    @Override
+    public EmbeddingModel createEmbeddingModel(ModelConfig config) {
+        ZhiPuAiApi openAiApi = ZhiPuAiApi.builder()
+                .apiKey(config.getApiKey())
+                .baseUrl(config.getBaseUrl())
+                .build();
+        ZhiPuAiEmbeddingOptions options = ZhiPuAiEmbeddingOptions.builder()
+                .model(config.getModel())
+                .build();
+        return new ZhiPuAiEmbeddingModel(openAiApi, MetadataMode.EMBED, options);
     }
 }

@@ -2,6 +2,7 @@ package com.roydon.dear.model.provider;
 
 import com.roydon.dear.session.entity.ModelConfig;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.minimax.MiniMaxChatModel;
 import org.springframework.ai.minimax.MiniMaxChatOptions;
 import org.springframework.ai.minimax.api.MiniMaxApi;
@@ -54,5 +55,10 @@ public class MiniMaxModelProvider implements ModelProvider {
         }
 
         return new MiniMaxChatModel(miniMaxApi, optionsBuilder.build());
+    }
+
+    @Override
+    public EmbeddingModel createEmbeddingModel(ModelConfig config) {
+        return null;
     }
 }

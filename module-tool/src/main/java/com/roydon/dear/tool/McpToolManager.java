@@ -1,5 +1,8 @@
 package com.roydon.dear.tool;
 
+import com.alibaba.cloud.ai.graph.agent.hook.skills.ReadSkillTool;
+import com.alibaba.cloud.ai.graph.skills.registry.SkillRegistry;
+import com.alibaba.cloud.ai.graph.skills.registry.filesystem.FileSystemSkillRegistry;
 import com.roydon.dear.skill.tool.SkillsTool;
 import com.roydon.dear.tool.registry.McpRegistry;
 import jakarta.annotation.PostConstruct;
@@ -44,10 +47,27 @@ public class McpToolManager {
         // 2、MCP 工具
         all.addAll(registry.getAllToolCallbacks());
         // 3、skill
-        if (skillsTool != null) {
-            all.addAll(Arrays.asList(skillsTool.getAllToolCallbacks()));
-        }
+//        if (skillsTool != null) {
+//            all.addAll(Arrays.asList(skillsTool.getAllToolCallbacks()));
+//        }
+          /*
+          1. 创建 ClasspathSkillRegistry，从 classpath:skills/ 下加载 Skill
+         */
+        SkillRegistry skillRegistry = FileSystemSkillRegistry.builder()
+                .userSkillsDirectory(System.getProperty("user.home") + "/.dear-agent/.skills")
+                .build();
+
+        /*
+          2. 创建 read_skill 工具的 ToolCallback
+             这是 LLM 在推理时主动调用的工具，用于按需读取某个 Skill 的完整 SKILL.md 内容
+         */
+        ToolCallback readSkillToolCallback = ReadSkillTool.createReadSkillToolCallback(skillRegistry, null);
+        all.add(readSkillToolCallback);
         return all.toArray(ToolCallback[]::new);
+    }
+
+    public static void main(String[] args) {
+        System.out.println("System.getProperty(\"user.home\") = " + System.getProperty("user.home"));
     }
 
     public ToolCallback[] getFileTools() {

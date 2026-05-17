@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
@@ -89,10 +90,26 @@ public class ModelAdminController {
                     .findFirst()
                     .orElseThrow(() -> new IllegalArgumentException("不支持的供应商: " + cfg.getProvider()));
 
-            ChatModel chatModel = provider.createChatModel(cfg);
-            String resp = ChatClient.builder(chatModel).build()
-                    .prompt().user("回复 ok 即可，不要多余内容").call().content();
-            return BaseResult.newSuccess("连接成功, 模型响应: " + resp);
+            switch (cfg.getCategory()) {
+                case "chat":
+                    ChatModel chatModel = provider.createChatModel(cfg);
+                    String resp = ChatClient.builder(chatModel).build()
+                            .prompt()
+                            .user("回复 ok 即可，不要多余内容")
+                            .call()
+                            .content();
+                    return BaseResult.newSuccess("连接成功, 模型响应: " + resp);
+                case "embedding":
+                    EmbeddingModel embeddingModel = provider.createEmbeddingModel(cfg);
+                    if (embeddingModel == null) {
+                        return BaseResult.newError("供应商 " + cfg.getProvider() + " 不支持 Embedding 模型");
+                    }
+                    float[] helloWorlds = embeddingModel.embed("hello world");
+                    log.info("hello world embedding: {}", helloWorlds);
+                    return BaseResult.newSuccess("连接成功，模型维度：" + helloWorlds.length);
+                default:
+                    throw new IllegalArgumentException("不支持的模型类别: " + cfg.getCategory());
+            }
         } catch (Exception e) {
             log.error("模型连接测试失败", e);
             return BaseResult.newError("连接失败: " + e.getMessage());

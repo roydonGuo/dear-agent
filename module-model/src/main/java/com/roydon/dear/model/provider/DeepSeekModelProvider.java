@@ -9,6 +9,7 @@ import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.deepseek.DeepSeekChatModel;
 import org.springframework.ai.deepseek.DeepSeekChatOptions;
 import org.springframework.ai.deepseek.api.DeepSeekApi;
+import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -86,6 +87,11 @@ public class DeepSeekModelProvider implements ModelProvider {
 
         log.info("DeepSeek 模型已初始化: model={}, reasoning_content 修复已启用", config.getModel());
         return new ReasoningChatModelWrapper(chatModel);
+    }
+
+    @Override
+    public EmbeddingModel createEmbeddingModel(ModelConfig config) {
+        return null;
     }
 
     // ===== 工具方法 =====

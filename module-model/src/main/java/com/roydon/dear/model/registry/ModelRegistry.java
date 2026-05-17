@@ -21,6 +21,12 @@ import java.util.concurrent.ConcurrentHashMap;
 public class ModelRegistry {
 
     private final Map<String, ChatModel> chatModelCache = new ConcurrentHashMap<>();
+    /**
+     * 各分类对应模型
+     * eg：
+     * chat: deepseek-v4-pro
+     * embedding: text-embedding-v4
+     */
     private final Map<String, String> defaultModelNames = new ConcurrentHashMap<>();
 
     private final List<ModelProvider> providers;

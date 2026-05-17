@@ -1,5 +1,9 @@
 package com.roydon.dear.web.controller;
 
+import com.alibaba.cloud.ai.graph.agent.hook.skills.ReadSkillTool;
+import com.alibaba.cloud.ai.graph.skills.SpringAiSkillAdvisor;
+import com.alibaba.cloud.ai.graph.skills.registry.SkillRegistry;
+import com.alibaba.cloud.ai.graph.skills.registry.filesystem.FileSystemSkillRegistry;
 import com.roydon.dear.agent.DearAgent;
 import com.roydon.dear.common.AgentResponse;
 import com.roydon.dear.common.manager.AgentTaskManager;
@@ -17,8 +21,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.support.ToolCallbacks;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -55,7 +61,7 @@ public class AgentController {
     @Autowired
     private McpToolManager mcpToolManager;
 
-    @GetMapping(value = "/chat/stream", produces = "text/event-stream;charset=UTF-8")
+    @GetMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @Operation(summary = "智能问答", description = "接收用户查询并返回流式响应，使用联网搜索获取信息")
     public Flux<String> webSearchStream(@RequestParam(required = true) String query,
                                         @RequestParam(required = true) String conversationId,
@@ -134,17 +140,30 @@ public class AgentController {
 
         ChatModel chatModel = modelRegistry.getDefaultChatModel("chat");
 
+        SkillRegistry skillRegistry = FileSystemSkillRegistry.builder()
+                .userSkillsDirectory(System.getProperty("user.home") + "/.dear-agent/.skills")
+                .build();
+
+        /*
+          3. 创建 SpringAiSkillAdvisor，把 SkillRegistry 注入进去
+             Advisor 会在每次对话的 before() 阶段将 Skill 列表追加到 System Prompt
+         */
+        SpringAiSkillAdvisor skillAdvisor = SpringAiSkillAdvisor.builder()
+                .skillRegistry(skillRegistry)
+                .build();
+
         // todo 根据不同类型切换不同agent
 
         DearAgent dearReact = DearAgent.builder()
                 .name("dear react")
                 .chatModel(chatModel)
-                .tools(tools)
+                .tools(tools) // function call / mcp / read_skill
+                .advisors(skillAdvisor) // skill advisors
                 .systemPrompt(systemPrompt)
                 .conversationService(conversationService)
                 .messageService(messageService)
                 .taskManager(taskManager)
-                .maxRounds(5)
+                .maxRounds(10)
                 .build();
 
         if (StringUtils.isNotBlank(conversationId)) {

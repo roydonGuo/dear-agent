@@ -5,6 +5,7 @@ import org.springframework.ai.anthropic.AnthropicChatModel;
 import org.springframework.ai.anthropic.AnthropicChatOptions;
 import org.springframework.ai.anthropic.api.AnthropicApi;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.minimax.MiniMaxChatModel;
 import org.springframework.ai.minimax.MiniMaxChatOptions;
 import org.springframework.ai.minimax.api.MiniMaxApi;
@@ -56,5 +57,10 @@ public class AnthropicModelProvider implements ModelProvider {
                 .anthropicApi(anthropicApi)
                 .defaultOptions(optionsBuilder.build())
                 .build();
+    }
+
+    @Override
+    public EmbeddingModel createEmbeddingModel(ModelConfig config) {
+        return null;
     }
 }

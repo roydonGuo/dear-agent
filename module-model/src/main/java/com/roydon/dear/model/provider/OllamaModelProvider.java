@@ -2,12 +2,13 @@ package com.roydon.dear.model.provider;
 
 import com.roydon.dear.session.entity.ModelConfig;
 import org.springframework.ai.chat.model.ChatModel;
-import org.springframework.ai.deepseek.DeepSeekChatModel;
-import org.springframework.ai.deepseek.DeepSeekChatOptions;
-import org.springframework.ai.deepseek.api.DeepSeekApi;
+import org.springframework.ai.document.MetadataMode;
+import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.ollama.OllamaChatModel;
+import org.springframework.ai.ollama.OllamaEmbeddingModel;
 import org.springframework.ai.ollama.api.OllamaApi;
 import org.springframework.ai.ollama.api.OllamaChatOptions;
+import org.springframework.ai.ollama.api.OllamaEmbeddingOptions;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -50,6 +51,17 @@ public class OllamaModelProvider implements ModelProvider {
         return OllamaChatModel.builder()
                 .ollamaApi(ollamaApi)
                 .defaultOptions(optionsBuilder.build())
+                .build();
+    }
+
+    @Override
+    public EmbeddingModel createEmbeddingModel(ModelConfig config) {
+        OllamaApi ollamaApi = OllamaApi.builder()
+                .baseUrl(config.getBaseUrl())
+                .build();
+        return OllamaEmbeddingModel.builder()
+                .ollamaApi(ollamaApi)
+                .defaultOptions(OllamaEmbeddingOptions.builder().model(config.getModel()).build())
                 .build();
     }
 }

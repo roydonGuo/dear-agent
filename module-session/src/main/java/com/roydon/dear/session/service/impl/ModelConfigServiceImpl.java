@@ -64,8 +64,8 @@ public class ModelConfigServiceImpl extends ServiceImpl<ModelConfigMapper, Model
      */
     @Override
     @CacheInvalidate(name = ":modelConfig:enabled")
-    @CacheInvalidate(name = ":modelConfig:list:")
-    @CacheInvalidate(name = ":modelConfig:category:")
+    @CacheInvalidate(name = ":modelConfig:list:all_all")
+    @CacheInvalidate(name = ":modelConfig:category")
     public void evictListCache() {
         // @CacheInvalidate 注解处理 keyless 缓存项
         // 带 key 的缓存项依赖 300s 本地过期时间自动刷新

@@ -30,6 +30,12 @@
             <groupId>com.roydon.dear</groupId>
             <artifactId>module-session</artifactId>
         </dependency>
+        <!-- 加载skill -->
+        <dependency>
+            <groupId>com.alibaba.cloud.ai</groupId>
+            <artifactId>spring-ai-alibaba-agent-framework</artifactId>
+            <version>${spring.ai.alibaba.version}</version>
+        </dependency>
     </dependencies>
 
 </project>
