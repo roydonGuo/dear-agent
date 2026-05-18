@@ -118,6 +118,7 @@ public class AgentController {
     }
 
     private DearAgent initDearAgent(String conversationId, boolean webSearchEnabled) {
+        log.debug("开始初始化DearAgent: conversationId={}, webSearchEnabled={}", conversationId, webSearchEnabled);
         String systemPrompt;
         ToolCallback[] tools;
         // 填充系统提示词
@@ -165,7 +166,7 @@ public class AgentController {
                 .taskManager(taskManager)
                 .maxRounds(10)
                 .build();
-
+        log.debug("初始化DearReact完成");
         if (StringUtils.isNotBlank(conversationId)) {
             ChatMemory chatMemory = dearReact.createPersistentChatMemory(conversationId, 30);
             dearReact.setChatMemory(chatMemory);

@@ -79,6 +79,7 @@ public abstract class BaseAgent {
     }
 
     public ChatMemory createPersistentChatMemory(String sessionId, int maxMessages) {
+        log.debug("创建持久化ChatMemory: sessionId={}, maxMessages={}", sessionId, maxMessages);
         if (conversationService == null) {
             log.warn("conversationService is null, cannot load chat memory");
             return MessageWindowChatMemory.builder().maxMessages(maxMessages).build();
@@ -87,7 +88,8 @@ public abstract class BaseAgent {
         if (conversation == null) {
             return MessageWindowChatMemory.builder().maxMessages(maxMessages).build();
         }
-        List<ChatMessage> history = messageService.findRecentByConversationId(conversation.getId(), maxMessages * 2);
+        // 从 Redis 缓存读取最近消息（DESC 顺序），未命中时回退 DB 并预热缓存
+        List<ChatMessage> history = messageService.getRecentMessagesForMemory(conversation.getId(), maxMessages * 2);
         ChatMemory chatMemory = MessageWindowChatMemory.builder().maxMessages(maxMessages).build();
         if (history != null && !history.isEmpty()) {
             for (int i = history.size() - 1; i >= 0; i--) {
@@ -109,6 +111,7 @@ public abstract class BaseAgent {
     protected String createReferenceResponse(String content) { return AgentResponse.reference(content); }
     protected String createErrorResponse(String content) { return AgentResponse.error(content); }
     protected String createRecommendResponse(String content) { return AgentResponse.recommend(content); }
+    protected String createFunctionResponse(String content) { return AgentResponse.function(content); }
     protected String createDoneResponse(String content) { return AgentResponse.done(content); }
 
     protected void recordFirstResponse() {

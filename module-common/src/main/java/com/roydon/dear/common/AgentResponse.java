@@ -15,13 +15,20 @@ public class AgentResponse {
     public static final String TYPE_EXPRESSION = "expression";
     public static final String TYPE_DONE = "done";
     public static final String TYPE_AUDIO = "audio";
+    /**
+     * 工具相关
+     */
+    public static final String TYPE_FUNCTION = "function";
+    public static final String TYPE_MCP = "mcp";
+    public static final String TYPE_SKILL = "skill";
 
     private String type;
     private String content;
     private Integer count;
     private Object data;
 
-    public AgentResponse() {}
+    public AgentResponse() {
+    }
 
     public AgentResponse(String type, String content) {
         this.type = type;
@@ -59,7 +66,8 @@ public class AgentResponse {
             if (jsonArray != null) {
                 return reference(content, jsonArray.size());
             }
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
         return reference(content, null);
     }
 
@@ -75,6 +83,10 @@ public class AgentResponse {
         return new AgentResponse(TYPE_RECOMMEND, content, count).toJson();
     }
 
+    public static String function(String content) {
+        return new AgentResponse(TYPE_FUNCTION, content).toJson();
+    }
+
     public static String done(String content) {
         return new AgentResponse(TYPE_DONE, content).toJson();
     }
@@ -86,7 +98,8 @@ public class AgentResponse {
                 if (jsonArray != null && !jsonArray.isEmpty()) {
                     return reference(jsonStr, jsonArray.size());
                 }
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+            }
         }
         return new AgentResponse(type, content == null ? null : content.toString()).toJson();
     }

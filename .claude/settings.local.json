@@ -36,29 +36,15 @@
       "Bash(cmd.exe /c \"dir D:\\\\JetBrains\\\\JavaProjects\\\\dear-agent\\\\.mvn 2>nul\")",
       "Bash(cmd.exe /c \"cd /d C:\\\\Users\\\\31330\\\\AppData\\\\Local\\\\JetBrains && dir /s /b mvn.cmd 2>nul\")",
       "Bash(xargs -I{} jar tf {})",
-      "Bash(mvn clean *)",
+      "Read(//c/Program Files/**)",
+      "Read(//c/Users/admin/**)",
       "Bash(where mvn *)",
-      "Read(//c//**)",
-      "Bash(ls /c/apache-maven*)",
-      "Bash(\"/c/Users/31330/.m2/wrapper/dists/apache-maven-3.9.11-bin/6mqf5t809d9geo83kj4ttckcbc/apache-maven-3.9.11/bin/mvn.cmd\" -f D:/JetBrains/JavaProjects/dear-agent/pom.xml clean compile -q)",
-      "Bash(mvn dependency:resolve -pl module-common -q)",
-      "Read(//d/JetBrains//**)",
-      "Read(//d/JetBrains/**)",
-      "Bash(whereis mvn *)",
-      "Read(//d//**)",
-      "Bash(export JAVA_HOME=\"D:\\\\Java\\\\jdk-21.0.4\")",
-      "Bash(export PATH=\"/d/JetBrains/IntelliJ IDEA 2024.1.4/plugins/maven/lib/maven3/bin:$PATH\")",
-      "Bash(./mvnw clean *)",
-      "Bash(./gradlew)",
-      "Bash(where.exe mvn *)",
-      "Bash(cmd //c \"where mvn\")",
-      "Bash(cmd //c \"mvn -version\")",
-      "Bash(export JAVA_HOME=\"/d/JetBrains/IntelliJ IDEA 2024.1.4/jbr\")",
-      "Bash(\"/d/JetBrains/IntelliJ IDEA 2024.1.4/plugins/maven/lib/maven3/bin/mvn\" clean compile -pl module-knowledge,module-web -am -q)",
-      "Bash(\"/d/JetBrains/IntelliJ IDEA 2024.1.4/plugins/maven/lib/maven3/bin/mvn\" compile -pl module-knowledge,module-web -am)"
+      "Bash(find /c -name \"mvn\" -type f)"
     ]
   },
   "enabledPlugins": {
-    "superpowers@claude-plugins-official": true
+    "superpowers@claude-plugins-official": true,
+    "code-review@claude-plugins-official": true,
+    "code-simplifier@claude-plugins-official": true
   }
 }

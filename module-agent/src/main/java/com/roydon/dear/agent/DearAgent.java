@@ -88,8 +88,14 @@ public class DearAgent extends BaseAgent {
         return streamInternal(conversationId, question, true);
     }
 
-    public Flux<String> stream(String question) { return streamInternal(null, question, true); }
-    public Flux<String> stream(String conversationId, String question) { return streamInternal(conversationId, question, true); }
+    public Flux<String> stream(String question) {
+        return streamInternal(null, question, true);
+    }
+
+    public Flux<String> stream(String conversationId, String question) {
+        return streamInternal(conversationId, question, true);
+    }
+
     public Flux<String> stream(String conversationId, String question, boolean enableThinking) {
         return streamInternal(conversationId, question, enableThinking);
     }
@@ -151,7 +157,9 @@ public class DearAgent extends BaseAgent {
                         JSONObject json = JSON.parseObject(chunk);
                         String type = json.getString("type");
                         if ("text".equals(type)) finalAnswerBuffer.append(json.getString("content"));
-                    } catch (Exception e) { finalAnswerBuffer.append(chunk); }
+                    } catch (Exception e) {
+                        finalAnswerBuffer.append(chunk);
+                    }
                 })
                 .doOnCancel(() -> {
                     hasSentFinalResult.set(true);
@@ -173,7 +181,8 @@ public class DearAgent extends BaseAgent {
             long totalResponseTime = getTotalResponseTime();
             String toolsStr = getUsedToolsString();
             String referenceJson = "";
-            if (!agentState.searchResults.isEmpty()) referenceJson = createReferenceResponse(JSON.toJSONString(agentState.searchResults));
+            if (!agentState.searchResults.isEmpty())
+                referenceJson = createReferenceResponse(JSON.toJSONString(agentState.searchResults));
             messageService.saveAssistantMessage(
                     currentConversationNumericId,
                     currentUserMessageId,
@@ -204,7 +213,12 @@ public class DearAgent extends BaseAgent {
                 .publishOn(Schedulers.boundedElastic())
                 .doOnNext(chunk -> processChunk(chunk, sink, state, thinkingBuffer, enableThinking))
                 .doOnComplete(() -> finishRound(messages, sink, state, roundCounter, hasSentFinalResult, finalAnswerBuffer, useMemory, conversationId, agentState, thinkingBuffer, enableThinking))
-                .doOnError(err -> { if (!hasSentFinalResult.get()) { hasSentFinalResult.set(true); sink.tryEmitError(err); } })
+                .doOnError(err -> {
+                    if (!hasSentFinalResult.get()) {
+                        hasSentFinalResult.set(true);
+                        sink.tryEmitError(err);
+                    }
+                })
                 .subscribe();
 
         if (conversationId != null && taskManager != null) taskManager.setDisposable(conversationId, disposable);
@@ -233,7 +247,10 @@ public class DearAgent extends BaseAgent {
             return;
         }
 
-        if (text != null) { sink.tryEmitNext(createTextResponse(text)); state.textBuffer.append(text); }
+        if (text != null) {
+            sink.tryEmitNext(createTextResponse(text));
+            state.textBuffer.append(text);
+        }
     }
 
     private void mergeToolCall(RoundState state, AssistantMessage.ToolCall incoming) {
@@ -288,6 +305,7 @@ public class DearAgent extends BaseAgent {
             return;
         }
 
+        /// 执行工具调用
         executeToolCalls(sink, state.toolCalls, messages, hasSentFinalResult, state, agentState, thinkingBuffer, enableThinking, () -> {
             if (!hasSentFinalResult.get()) {
                 scheduleRound(messages, sink, roundCounter, hasSentFinalResult, finalAnswerBuffer, useMemory, conversationId, agentState, thinkingBuffer, enableThinking);
@@ -304,7 +322,9 @@ public class DearAgent extends BaseAgent {
         } else {
             newMessages.add(new SystemMessage(ReactAgentPrompts.getWebSearchPrompt()));
         }
-        for (Message msg : messages) { if (!(msg instanceof SystemMessage)) newMessages.add(msg); }
+        for (Message msg : messages) {
+            if (!(msg instanceof SystemMessage)) newMessages.add(msg);
+        }
         newMessages.add(new UserMessage("""
                 你已达到最大推理轮次限制。
                 请基于当前已有的上下文信息，直接给出最终答案。
@@ -321,7 +341,10 @@ public class DearAgent extends BaseAgent {
                 .doOnNext(chunk -> {
                     if (chunk == null || chunk.getResult() == null || chunk.getResult().getOutput() == null) return;
                     String text = chunk.getResult().getOutput().getText();
-                    if (text != null && !hasSentFinalResult.get()) { sink.tryEmitNext(createTextResponse(text)); finalTextBuffer.append(text); }
+                    if (text != null && !hasSentFinalResult.get()) {
+                        sink.tryEmitNext(createTextResponse(text));
+                        finalTextBuffer.append(text);
+                    }
                 })
                 .doOnComplete(() -> {
                     String referenceJson = "";
@@ -331,18 +354,27 @@ public class DearAgent extends BaseAgent {
                     }
                     if (enableRecommendations) {
                         String recommendations = generateRecommendations(conversationId, currentQuestion, finalText);
-                        if (recommendations != null) { currentRecommendations = recommendations; sink.tryEmitNext(createRecommendResponse(recommendations)); }
+                        if (recommendations != null) {
+                            currentRecommendations = recommendations;
+                            sink.tryEmitNext(createRecommendResponse(recommendations));
+                        }
                     }
                     sink.tryEmitNext(createDoneResponse(conversationId));
                     hasSentFinalResult.set(true);
                     sink.tryEmitComplete();
                 })
-                .doOnError(err -> { hasSentFinalResult.set(true); sink.tryEmitError(err); })
+                .doOnError(err -> {
+                    hasSentFinalResult.set(true);
+                    sink.tryEmitError(err);
+                })
                 .subscribe();
 
         if (conversationId != null && taskManager != null) taskManager.setDisposable(conversationId, disposable);
     }
 
+    /**
+     * 执行工具调用
+     */
     private void executeToolCalls(Sinks.Many<String> sink, List<AssistantMessage.ToolCall> toolCalls, List<Message> messages,
                                   AtomicBoolean hasSentFinalResult, RoundState state, AgentState agentState,
                                   StringBuilder thinkingBuffer, boolean enableThinking, Runnable onComplete) {
@@ -352,7 +384,10 @@ public class DearAgent extends BaseAgent {
 
         for (AssistantMessage.ToolCall tc : toolCalls) {
             Schedulers.boundedElastic().schedule(() -> {
-                if (hasSentFinalResult.get()) { completeToolCall(completedCount, totalToolCalls, responseMap, toolCalls, messages, onComplete); return; }
+                if (hasSentFinalResult.get()) {
+                    completeToolCall(completedCount, totalToolCalls, responseMap, toolCalls, messages, onComplete);
+                    return;
+                }
 
                 String toolName = tc.name();
                 String argsJson = tc.arguments();
@@ -378,6 +413,9 @@ public class DearAgent extends BaseAgent {
                     recordUsedTool(toolName);
                     if (toolName.contains("tavily")) parseSearchResult(resultStr, agentState);
                     responseMap.put(tc.id(), new ToolResponseMessage.ToolResponse(tc.id(), toolName, resultStr));
+                    // todo 将本次在执行的工具名称和结果发送给前端
+
+//                    sink.tryEmitNext();
                 } catch (Exception ex) {
                     responseMap.put(tc.id(), new ToolResponseMessage.ToolResponse(tc.id(), toolName, "{ \"error\": \"工具执行失败：" + ex.getMessage() + "\" }"));
                 } finally {
@@ -419,7 +457,9 @@ public class DearAgent extends BaseAgent {
                 String content = getSafe(item, "content");
                 if (url != null && !url.isBlank()) state.searchResults.add(new SearchResult(url, title, content));
             }
-        } catch (Exception e) { log.warn("解析 tavily 搜索结果失败: {}", e.getMessage()); }
+        } catch (Exception e) {
+            log.warn("解析 tavily 搜索结果失败: {}", e.getMessage());
+        }
     }
 
     private String getSafe(JsonNode node, String field) {
@@ -444,7 +484,11 @@ public class DearAgent extends BaseAgent {
 
     private String extractThinkingFromMetadata(Map<String, Object> metadata) {
         if (metadata == null) return null;
-        try { return firstNonBlankThinking(metadata); } catch (Exception ignored) { return null; }
+        try {
+            return firstNonBlankThinking(metadata);
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 
     private String firstNonBlankThinking(Map<String, Object> metadata) {
@@ -463,7 +507,10 @@ public class DearAgent extends BaseAgent {
             StringBuilder sb = new StringBuilder();
             for (Object item : collection) {
                 String text = extractString(item);
-                if (StringUtils.isNotBlank(text)) { if (sb.length() > 0) sb.append('\n'); sb.append(text); }
+                if (StringUtils.isNotBlank(text)) {
+                    if (sb.length() > 0) sb.append('\n');
+                    sb.append(text);
+                }
             }
             return sb.toString();
         }
@@ -477,9 +524,13 @@ public class DearAgent extends BaseAgent {
         return Objects.toString(value, null);
     }
 
-    public void setMaxRounds(int maxRounds) { this.maxRounds = maxRounds; }
+    public void setMaxRounds(int maxRounds) {
+        this.maxRounds = maxRounds;
+    }
 
-    public static Builder builder() { return new Builder(); }
+    public static Builder builder() {
+        return new Builder();
+    }
 
     public static class Builder {
         private String name;
@@ -494,19 +545,70 @@ public class DearAgent extends BaseAgent {
         private ChatMessageService messageService;
         private AgentTaskManager taskManager;
 
-        public Builder chatMemory(ChatMemory chatMemory) { this.chatMemory = chatMemory; return this; }
-        public Builder conversationService(ChatConversationService conversationService) { this.conversationService = conversationService; return this; }
-        public Builder messageService(ChatMessageService messageService) { this.messageService = messageService; return this; }
-        public Builder taskManager(AgentTaskManager taskManager) { this.taskManager = taskManager; return this; }
-        public Builder name(String name) { this.name = name; return this; }
-        public Builder chatModel(ChatModel chatModel) { this.chatModel = chatModel; return this; }
-        public Builder tools(ToolCallback... tools) { this.tools = Arrays.asList(tools); return this; }
-        public Builder tools(List<ToolCallback> tools) { this.tools = tools; return this; }
-        public Builder advisors(List<Advisor> advisors) { this.advisors = advisors; return this; }
-        public Builder advisors(Advisor... advisors) { this.advisors = Arrays.asList(advisors); return this; }
-        public Builder systemPrompt(String systemPrompt) { this.systemPrompt = systemPrompt; return this; }
-        public Builder maxReflectionRounds(int maxReflectionRounds) { this.maxReflectionRounds = maxReflectionRounds; return this; }
-        public Builder maxRounds(int maxRounds) { this.maxRounds = maxRounds; return this; }
+        public Builder chatMemory(ChatMemory chatMemory) {
+            this.chatMemory = chatMemory;
+            return this;
+        }
+
+        public Builder conversationService(ChatConversationService conversationService) {
+            this.conversationService = conversationService;
+            return this;
+        }
+
+        public Builder messageService(ChatMessageService messageService) {
+            this.messageService = messageService;
+            return this;
+        }
+
+        public Builder taskManager(AgentTaskManager taskManager) {
+            this.taskManager = taskManager;
+            return this;
+        }
+
+        public Builder name(String name) {
+            this.name = name;
+            return this;
+        }
+
+        public Builder chatModel(ChatModel chatModel) {
+            this.chatModel = chatModel;
+            return this;
+        }
+
+        public Builder tools(ToolCallback... tools) {
+            this.tools = Arrays.asList(tools);
+            return this;
+        }
+
+        public Builder tools(List<ToolCallback> tools) {
+            this.tools = tools;
+            return this;
+        }
+
+        public Builder advisors(List<Advisor> advisors) {
+            this.advisors = advisors;
+            return this;
+        }
+
+        public Builder advisors(Advisor... advisors) {
+            this.advisors = Arrays.asList(advisors);
+            return this;
+        }
+
+        public Builder systemPrompt(String systemPrompt) {
+            this.systemPrompt = systemPrompt;
+            return this;
+        }
+
+        public Builder maxReflectionRounds(int maxReflectionRounds) {
+            this.maxReflectionRounds = maxReflectionRounds;
+            return this;
+        }
+
+        public Builder maxRounds(int maxRounds) {
+            this.maxRounds = maxRounds;
+            return this;
+        }
 
         public DearAgent build() {
             if (chatModel == null) throw new IllegalArgumentException("chatModel 不能为空！");

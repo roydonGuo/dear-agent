@@ -11,6 +11,11 @@ public interface ChatMessageService extends IService<ChatMessage> {
 
     List<ChatMessage> findRecentByConversationId(Long conversationId, int limit);
 
+    /**
+     * 从 Redis 缓存获取最近消息（用于构建 ChatMemory），缓存未命中时回退到 DB 并预热缓存
+     */
+    List<ChatMessage> getRecentMessagesForMemory(Long conversationId, int limit);
+
     ChatMessage saveUserMessage(Long conversationId, String content, String fileid);
 
     ChatMessage saveAssistantMessage(Long conversationId, Long replyId, String content,
