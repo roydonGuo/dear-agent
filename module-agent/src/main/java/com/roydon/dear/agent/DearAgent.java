@@ -144,9 +144,10 @@ public class DearAgent extends BaseAgent {
         StringBuilder finalAnswerBuffer = new StringBuilder();
         StringBuilder thinkingBuffer = new StringBuilder();
         AgentState agentState = new AgentState();
+        List<JSONObject> toolCallMessages = Collections.synchronizedList(new ArrayList<>());
 
         // 轮询
-        scheduleRound(messages, sink, roundCounter, hasSentFinalResult, finalAnswerBuffer, useMemory, conversationId, agentState, thinkingBuffer, enableThinking);
+        scheduleRound(messages, sink, roundCounter, hasSentFinalResult, finalAnswerBuffer, useMemory, conversationId, agentState, thinkingBuffer, enableThinking, toolCallMessages);
 
         String finalConversationId = conversationId;
         String finalConversationId1 = conversationId;
@@ -168,18 +169,18 @@ public class DearAgent extends BaseAgent {
                 .doFinally(signalType -> {
                     log.info("最终答案: {}", finalAnswerBuffer);
                     log.info("思考过程: {}", thinkingBuffer);
-                    saveSessionResult(finalConversationId, finalAnswerBuffer, thinkingBuffer, agentState);
+                    saveSessionResult(finalConversationId, finalAnswerBuffer, thinkingBuffer, agentState, toolCallMessages);
                     if (taskManager != null) taskManager.stopTask(finalConversationId);
                     // todo 发送 done 消息
 //                    sink.tryEmitNext(createDoneResponse(finalConversationId1));
                 });
     }
 
-    private void saveSessionResult(String conversationId, StringBuilder finalAnswerBuffer, StringBuilder thinkingBuffer, AgentState agentState) {
+    private void saveSessionResult(String conversationId, StringBuilder finalAnswerBuffer, StringBuilder thinkingBuffer, AgentState agentState, List<JSONObject> toolCallMessages) {
         if (conversationService != null && messageService != null && currentConversationNumericId != null
                 && currentUserMessageId != null && finalAnswerBuffer.length() > 0) {
             long totalResponseTime = getTotalResponseTime();
-            String toolsStr = getUsedToolsString();
+            String toolsStr = toolCallMessages.isEmpty() ? getUsedToolsString() : JSON.toJSONString(toolCallMessages);
             String referenceJson = "";
             if (!agentState.searchResults.isEmpty())
                 referenceJson = createReferenceResponse(JSON.toJSONString(agentState.searchResults));
@@ -202,7 +203,7 @@ public class DearAgent extends BaseAgent {
 
     private void scheduleRound(List<Message> messages, Sinks.Many<String> sink, AtomicLong roundCounter, AtomicBoolean hasSentFinalResult,
                                StringBuilder finalAnswerBuffer, boolean useMemory, String conversationId, AgentState agentState,
-                               StringBuilder thinkingBuffer, boolean enableThinking) {
+                               StringBuilder thinkingBuffer, boolean enableThinking, List<JSONObject> toolCallMessages) {
         roundCounter.incrementAndGet();
         RoundState state = new RoundState();
 
@@ -212,7 +213,7 @@ public class DearAgent extends BaseAgent {
                 .chatResponse()
                 .publishOn(Schedulers.boundedElastic())
                 .doOnNext(chunk -> processChunk(chunk, sink, state, thinkingBuffer, enableThinking))
-                .doOnComplete(() -> finishRound(messages, sink, state, roundCounter, hasSentFinalResult, finalAnswerBuffer, useMemory, conversationId, agentState, thinkingBuffer, enableThinking))
+                .doOnComplete(() -> finishRound(messages, sink, state, roundCounter, hasSentFinalResult, finalAnswerBuffer, useMemory, conversationId, agentState, thinkingBuffer, enableThinking, toolCallMessages))
                 .doOnError(err -> {
                     if (!hasSentFinalResult.get()) {
                         hasSentFinalResult.set(true);
@@ -271,7 +272,7 @@ public class DearAgent extends BaseAgent {
     private void finishRound(List<Message> messages, Sinks.Many<String> sink, RoundState state,
                              AtomicLong roundCounter, AtomicBoolean hasSentFinalResult, StringBuilder finalAnswerBuffer,
                              boolean useMemory, String conversationId, AgentState agentState,
-                             StringBuilder thinkingBuffer, boolean enableThinking) {
+                             StringBuilder thinkingBuffer, boolean enableThinking, List<JSONObject> toolCallMessages) {
         if (state.getMode() != RoundMode.TOOL_CALL) {
             log.debug("结束轮次: round={}, mode={}, text={}", roundCounter.get(), state.getMode(), state.textBuffer.toString());
             String referenceJson = "";
@@ -306,9 +307,9 @@ public class DearAgent extends BaseAgent {
         }
 
         /// 执行工具调用
-        executeToolCalls(sink, state.toolCalls, messages, hasSentFinalResult, state, agentState, thinkingBuffer, enableThinking, () -> {
+        executeToolCalls(sink, state.toolCalls, messages, hasSentFinalResult, state, agentState, thinkingBuffer, enableThinking, toolCallMessages, () -> {
             if (!hasSentFinalResult.get()) {
-                scheduleRound(messages, sink, roundCounter, hasSentFinalResult, finalAnswerBuffer, useMemory, conversationId, agentState, thinkingBuffer, enableThinking);
+                scheduleRound(messages, sink, roundCounter, hasSentFinalResult, finalAnswerBuffer, useMemory, conversationId, agentState, thinkingBuffer, enableThinking, toolCallMessages);
             }
         });
     }
@@ -377,7 +378,7 @@ public class DearAgent extends BaseAgent {
      */
     private void executeToolCalls(Sinks.Many<String> sink, List<AssistantMessage.ToolCall> toolCalls, List<Message> messages,
                                   AtomicBoolean hasSentFinalResult, RoundState state, AgentState agentState,
-                                  StringBuilder thinkingBuffer, boolean enableThinking, Runnable onComplete) {
+                                  StringBuilder thinkingBuffer, boolean enableThinking, List<JSONObject> toolCallMessages, Runnable onComplete) {
         AtomicInteger completedCount = new AtomicInteger(0);
         int totalToolCalls = toolCalls.size();
         Map<String, ToolResponseMessage.ToolResponse> responseMap = new ConcurrentHashMap<>();
@@ -398,14 +399,24 @@ public class DearAgent extends BaseAgent {
                     completeToolCall(completedCount, totalToolCalls, responseMap, toolCalls, messages, onComplete);
                     return;
                 }
-                // todo 当触发搜索tool，emit
-                if (toolName.contains("search")) {
-                    JSONObject args = JSON.parseObject(argsJson);
-                    String query = (String) args.get("query");
-                    String queryThink = StringUtils.isNotBlank(query) ? "🔍 正在搜索信息: " + query + "\n" : "🔍 正在搜索相关信息\n";
-                    thinkingBuffer.append(queryThink);
-                    if (enableThinking) sink.tryEmitNext(createReferenceResponse(queryThink));
-                }
+                String toolType = getToolType(callback);
+
+                // 发射工具开始执行
+                JSONObject toolStartMsg = new JSONObject();
+                toolStartMsg.put("tool", toolName);
+                toolStartMsg.put("status", "start");
+                if (StringUtils.isNotBlank(argsJson)) toolStartMsg.put("args", argsJson);
+                sink.tryEmitNext(emitToolStatus(toolType, toolStartMsg.toJSONString()));
+                toolCallMessages.add(toolStartMsg);
+
+                // 搜索工具额外提示
+//                if (toolName.contains("search")) {
+//                    JSONObject args = JSON.parseObject(argsJson);
+//                    String query = (String) args.get("query");
+//                    String queryThink = StringUtils.isNotBlank(query) ? "正在搜索信息: " + query + "\n" : "正在搜索相关信息\n";
+//                    thinkingBuffer.append(queryThink);
+//                    if (enableThinking) sink.tryEmitNext(createThinkingResponse(queryThink));
+//                }
 
                 try {
                     Object result = callback.call(argsJson);
@@ -413,16 +424,50 @@ public class DearAgent extends BaseAgent {
                     recordUsedTool(toolName);
                     if (toolName.contains("tavily")) parseSearchResult(resultStr, agentState);
                     responseMap.put(tc.id(), new ToolResponseMessage.ToolResponse(tc.id(), toolName, resultStr));
-                    // todo 将本次在执行的工具名称和结果发送给前端
 
-//                    sink.tryEmitNext();
+                    // 发射工具执行结果
+                    JSONObject toolDoneMsg = new JSONObject();
+                    toolDoneMsg.put("tool", toolName);
+                    toolDoneMsg.put("status", "done");
+                    toolDoneMsg.put("result", resultStr);
+                    sink.tryEmitNext(emitToolStatus(toolType, toolDoneMsg.toJSONString()));
+                    toolCallMessages.add(toolDoneMsg);
                 } catch (Exception ex) {
                     responseMap.put(tc.id(), new ToolResponseMessage.ToolResponse(tc.id(), toolName, "{ \"error\": \"工具执行失败：" + ex.getMessage() + "\" }"));
+
+                    // 发射工具执行错误
+                    JSONObject toolErrorMsg = new JSONObject();
+                    toolErrorMsg.put("tool", toolName);
+                    toolErrorMsg.put("status", "error");
+                    toolErrorMsg.put("error", ex.getMessage());
+                    sink.tryEmitNext(emitToolStatus(toolType, toolErrorMsg.toJSONString()));
+                    toolCallMessages.add(toolErrorMsg);
                 } finally {
                     completeToolCall(completedCount, totalToolCalls, responseMap, toolCalls, messages, onComplete);
                 }
             });
         }
+    }
+
+    /**
+     * 根据 ToolCallback 类名判断工具类型：function / mcp / skill
+     */
+    private String getToolType(ToolCallback callback) {
+        String className = callback.getClass().getName().toLowerCase();
+        if (className.contains(".mcp.") || className.contains("mcptool")) return "mcp";
+        if (className.contains("skill")) return "skill";
+        return "function";
+    }
+
+    /**
+     * 根据工具类型发射对应 type 的 SSE 消息
+     */
+    private String emitToolStatus(String toolType, String content) {
+        return switch (toolType) {
+            case "mcp" -> createMcpResponse(content);
+            case "skill" -> createSkillResponse(content);
+            default -> createToolResponse(content);
+        };
     }
 
     private void completeToolCall(AtomicInteger completedCount, int total,

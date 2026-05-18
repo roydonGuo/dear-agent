@@ -112,6 +112,9 @@ public abstract class BaseAgent {
     protected String createErrorResponse(String content) { return AgentResponse.error(content); }
     protected String createRecommendResponse(String content) { return AgentResponse.recommend(content); }
     protected String createFunctionResponse(String content) { return AgentResponse.function(content); }
+    protected String createToolResponse(String content) { return AgentResponse.tool(content); }
+    protected String createMcpResponse(String content) { return AgentResponse.mcp(content); }
+    protected String createSkillResponse(String content) { return AgentResponse.skill(content); }
     protected String createDoneResponse(String content) { return AgentResponse.done(content); }
 
     protected void recordFirstResponse() {

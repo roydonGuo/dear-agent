@@ -87,6 +87,18 @@ public class AgentResponse {
         return new AgentResponse(TYPE_FUNCTION, content).toJson();
     }
 
+    public static String tool(String content) {
+        return new AgentResponse(TYPE_FUNCTION, content).toJson();
+    }
+
+    public static String mcp(String content) {
+        return new AgentResponse(TYPE_MCP, content).toJson();
+    }
+
+    public static String skill(String content) {
+        return new AgentResponse(TYPE_SKILL, content).toJson();
+    }
+
     public static String done(String content) {
         return new AgentResponse(TYPE_DONE, content).toJson();
     }

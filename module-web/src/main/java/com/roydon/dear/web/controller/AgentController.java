@@ -164,7 +164,7 @@ public class AgentController {
                 .conversationService(conversationService)
                 .messageService(messageService)
                 .taskManager(taskManager)
-                .maxRounds(10)
+                .maxRounds(50)
                 .build();
         log.debug("初始化DearReact完成");
         if (StringUtils.isNotBlank(conversationId)) {
