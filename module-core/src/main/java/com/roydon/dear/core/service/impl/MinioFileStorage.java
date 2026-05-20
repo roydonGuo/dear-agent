@@ -18,6 +18,7 @@ import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.util.Base64;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 public class MinioFileStorage implements FileStorage {
 
@@ -27,14 +28,16 @@ public class MinioFileStorage implements FileStorage {
 
     private final MinioClient minioClient;
     private final String defaultBucket;
+    private final String endpoint;
 
-    public MinioFileStorage(MinioClient minioClient, String defaultBucket) {
+    public MinioFileStorage(MinioClient minioClient, String defaultBucket, String endpoint) {
         this.minioClient = minioClient;
         this.defaultBucket = defaultBucket;
+        this.endpoint = endpoint;
     }
 
     @Override
-    public String upload(String bucket, String key, InputStream stream, long size, String contentType) {
+    public String upload(String bucket, String key, InputStream stream, long size, String contentType, boolean publicUrl) {
         try {
             ensureBucketExists(bucket);
             minioClient.putObject(PutObjectArgs.builder()
@@ -43,7 +46,7 @@ public class MinioFileStorage implements FileStorage {
                     .stream(stream, size, -1)
                     .contentType(contentType)
                     .build());
-            return getFileUrl(bucket, key);
+            return publicUrl ? getPublicFileUrl(bucket, key) : getFileUrl(bucket, key);
         } catch (Exception e) {
             log.error("MinIO upload failed, bucket={}, key={}", bucket, key, e);
             throw new RuntimeException("文件上传失败: " + e.getMessage());
@@ -51,7 +54,7 @@ public class MinioFileStorage implements FileStorage {
     }
 
     @Override
-    public String upload(MultipartFile file, String keyPrefix) {
+    public String upload(MultipartFile file, String keyPrefix, boolean publicUrl) {
         String originalFilename = file.getOriginalFilename();
         String extension = "";
         if (originalFilename != null && originalFilename.contains(".")) {
@@ -59,7 +62,7 @@ public class MinioFileStorage implements FileStorage {
         }
         String key = keyPrefix + "/" + UUID.randomUUID().toString().replace("-", "") + extension;
         try (InputStream inputStream = file.getInputStream()) {
-            return upload(defaultBucket, key, inputStream, file.getSize(), file.getContentType());
+            return upload(defaultBucket, key, inputStream, file.getSize(), file.getContentType(), publicUrl);
         } catch (Exception e) {
             log.error("MinIO multipart upload failed, filename={}", originalFilename, e);
             throw new RuntimeException("文件上传失败: " + e.getMessage());
@@ -102,7 +105,7 @@ public class MinioFileStorage implements FileStorage {
         byte[] data = Base64.getDecoder().decode(parts[1]);
         String key = keyPrefix + "/" + UUID.randomUUID().toString().replace("-", "") + extension;
         try (InputStream stream = new ByteArrayInputStream(data)) {
-            String url = upload(defaultBucket, key, stream, data.length, mimeType);
+            String url = upload(defaultBucket, key, stream, data.length, mimeType, false);
             return new FileUploadResult(url, key);
         } catch (Exception e) {
             log.error("MinIO base64 upload failed", e);
@@ -140,12 +143,17 @@ public class MinioFileStorage implements FileStorage {
                     .bucket(bucket)
                     .object(key)
                     .method(Method.GET)
+                    .expiry(1, TimeUnit.DAYS)
                     .build());
         } catch (Exception e) {
             log.error("MinIO getUrl failed, bucket={}, key={}", bucket, key, e);
-//            throw new RuntimeException("文件地址获取失败: " + e.getMessage());
             return null;
         }
+    }
+
+    @Override
+    public String getPublicFileUrl(String bucket, String key) {
+        return endpoint + bucket + "/" + key;
     }
 
     @Override

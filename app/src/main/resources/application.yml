@@ -6,8 +6,8 @@ server:
       force: true
       enabled: true
 spring:
-#  profiles:
-#    active: dev
+  profiles:
+    active: dev
   application:
     name: dear-agent
   servlet:
@@ -44,9 +44,9 @@ spring:
     anthropic:
       api-key: xxx
   datasource:
-    url: jdbc:mysql://43.240.221.8:3306/dear-agent?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=GMT%2B8
-    username: roydon
-    password: roydon#Mysql
+    url: jdbc:mysql://${mysql.host:localhost}:3306/dear-agent?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=GMT%2B8
+    username: ${mysql.username:root}
+    password: ${mysql.password:root}
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
       minimum-idle: 5
@@ -56,11 +56,11 @@ spring:
       max-lifetime: 1800000
   data:
     redis:
-      host: 43.240.221.8
-      port: 6379
-      database: 23
+      host: ${redis.host:localhost}
+      port: ${redis.port:6379}
+      database: ${redis.database:1}
       timeout: 5s
-      password: roydon#Redis
+      password: ${redis.password}
   redis:
     redisson:
       config: |
@@ -70,15 +70,15 @@ spring:
           timeout: 3000
           retryAttempts: 3
           retryInterval: 1500
-          password: roydon#Redis
           subscriptionsPerConnection: 5
           clientName: null
-          address: "redis://43.240.221.8:6379"
+          address: "redis://${redis.host:localhost}:${redis.port:6379}"
+          password: ${redis.password}
+          database: ${redis.database:1}
           subscriptionConnectionMinimumIdleSize: 1
           subscriptionConnectionPoolSize: 50
           connectionMinimumIdleSize: 24
           connectionPoolSize: 64
-          database: 23
           dnsMonitoringInterval: 5000
         threads: 16
         nettyThreads: 32
@@ -86,19 +86,6 @@ spring:
         transportMode: "NIO"
   mybatis-plus:
     mapper-locations: classpath:mapper/*.xml
-
-minio:
-  url: http://43.240.221.8:9000/
-  accessKey: roydon
-  secretKey: roydon#Minio
-  bucketName: dear-agent
-  endpoint: http://43.240.221.8:9000/
-
-
-# Tavily 搜索引擎配置
-#tavily:
-#  api-key: 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
-#  mcp-url: https://mcp.tavily.com/mcp/
 
 jetcache:
   statIntervalMinutes: 0
@@ -123,21 +110,3 @@ logging:
     com.roydon.dear: debug
     org.springframework.ai: debug
     io.modelcontextprotocol: debug
-
-#ai:
-#  tts:
-#    dashscope:
-#      api-key: @dashscope.api.key@
-#      base-url: https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation
-#      model: qwen3-tts-flash
-#      voice: Cherry
-#      language-type: Chinese
-# 阿里云 TTS 配置
-alibaba:
-  dashscope:
-    tts:
-      api-key: sk-cec420dff8b04f5f8aedf0d5e2c98a50
-      base-url: https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation
-      model: qwen3-tts-flash
-      voice: Cherry
-      language-type: Chinese

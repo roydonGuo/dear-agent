@@ -25,15 +25,38 @@ public class MinioConfig {
 
     @Bean
     public MinioFileStorage minioFileStorage(MinioClient minioClient) {
-        return new MinioFileStorage(minioClient, bucketName);
+        return new MinioFileStorage(minioClient, bucketName, endpoint);
     }
 
-    public String getEndpoint() { return endpoint; }
-    public void setEndpoint(String endpoint) { this.endpoint = endpoint; }
-    public String getAccessKey() { return accessKey; }
-    public void setAccessKey(String accessKey) { this.accessKey = accessKey; }
-    public String getSecretKey() { return secretKey; }
-    public void setSecretKey(String secretKey) { this.secretKey = secretKey; }
-    public String getBucketName() { return bucketName; }
-    public void setBucketName(String bucketName) { this.bucketName = bucketName; }
+    public String getEndpoint() {
+        return endpoint;
+    }
+
+    public void setEndpoint(String endpoint) {
+        this.endpoint = endpoint;
+    }
+
+    public String getAccessKey() {
+        return accessKey;
+    }
+
+    public void setAccessKey(String accessKey) {
+        this.accessKey = accessKey;
+    }
+
+    public String getSecretKey() {
+        return secretKey;
+    }
+
+    public void setSecretKey(String secretKey) {
+        this.secretKey = secretKey;
+    }
+
+    public String getBucketName() {
+        return bucketName;
+    }
+
+    public void setBucketName(String bucketName) {
+        this.bucketName = bucketName;
+    }
 }

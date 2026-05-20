@@ -11,7 +11,11 @@ import com.roydon.dear.knowledge.domain.entity.KnowledgeFileDO;
 import com.roydon.dear.knowledge.domain.entity.convertor.KnowledgeFileConvertor;
 import com.roydon.dear.knowledge.domain.resp.KnowledgeFileResp;
 import com.roydon.dear.knowledge.domain.resp.KnowledgeFileTreeNode;
+import com.roydon.dear.knowledge.enums.FileMineType;
+import com.roydon.dear.knowledge.enums.KnowledgeFileStatus;
 import com.roydon.dear.knowledge.mapper.KnowledgeFileMapper;
+import com.roydon.dear.knowledge.process.FileProcessStrategy;
+import com.roydon.dear.knowledge.process.FileProcessStrategyFactory;
 import com.roydon.dear.knowledge.service.IKnowledgeFileService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,6 +41,7 @@ public class KnowledgeFileServiceImpl extends ServiceImpl<KnowledgeFileMapper, K
 
     private final KnowledgeFileConvertor knowledgeFileConvertor;
     private final FileStorage fileStorage;
+    private final FileProcessStrategyFactory fileProcessStrategyFactory;
 
     @Override
     @Cached(name = CACHE_NAME + CACHE_NAME_TREE, key = "#baseId", cacheType = CacheType.BOTH, cacheNullValue = true, expire = 60, localExpire = 10, timeUnit = TimeUnit.MINUTES)
@@ -84,8 +89,7 @@ public class KnowledgeFileServiceImpl extends ServiceImpl<KnowledgeFileMapper, K
         }
 
         try {
-            fileStorage.upload(fileStorage.getDefaultBucket(), storagePath,
-                    new java.io.ByteArrayInputStream(fileBytes), file.getSize(), mineType);
+            fileStorage.upload(fileStorage.getDefaultBucket(), storagePath, new java.io.ByteArrayInputStream(fileBytes), file.getSize(), mineType, false);
         } catch (Exception e) {
             log.error("MinIO upload failed for knowledge file, name={}", originalFilename, e);
             throw new BusinessException("文件上传失败: " + e.getMessage());
@@ -112,12 +116,26 @@ public class KnowledgeFileServiceImpl extends ServiceImpl<KnowledgeFileMapper, K
         entity.setFileSize(file.getSize());
         entity.setCreateTime(LocalDateTime.now());
         entity.setUpdateTime(LocalDateTime.now());
+        entity.setStatus(KnowledgeFileStatus.INIT);
 
         resolveAncestors(entity);
         save(entity);
 
         log.info("Knowledge file uploaded: id={}, name={}, size={}, storagePath={}",
                 entity.getId(), originalFilename, file.getSize(), storagePath);
+
+        // todo 文档分段/向量化
+        FileProcessStrategy fileProcessStrategy = fileProcessStrategyFactory.get(FileMineType.valueOf(mineType));
+        if (fileProcessStrategy != null) {
+            fileProcessStrategy.processFile(entity, new java.io.ByteArrayInputStream(fileBytes));
+        }
+
+        log.info("Knowledge file processed: id={}, name={}",
+                entity.getId(), originalFilename);
+        // 更新文档状态
+        entity.setStatus(KnowledgeFileStatus.CONVERTED);
+//        entity.setConvertedDocUrl(fileUrl);
+//        result = knowledgeDocumentService.updateById(document);
 
         return toRespWithUrl(entity);
     }

@@ -68,6 +68,7 @@ public class McpToolManager {
 
     public static void main(String[] args) {
         System.out.println("System.getProperty(\"user.home\") = " + System.getProperty("user.home"));
+        // output: System.getProperty("user.home") = C:\Users\admin
     }
 
     public ToolCallback[] getFileTools() {

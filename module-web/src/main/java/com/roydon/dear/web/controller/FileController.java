@@ -18,6 +18,14 @@ public class FileController {
         this.fileStorage = fileStorage;
     }
 
+    /**
+     * 通用文件上传
+     * 知识库md文件图片上传：prefix：knowledge/images
+     *
+     * @param file   文件
+     * @param prefix 文件路径前缀
+     * @return 公共url
+     */
     @PostMapping("/upload")
     public BaseResult<String> upload(
             @RequestParam("file") MultipartFile file,
@@ -25,7 +33,7 @@ public class FileController {
         if (file.isEmpty()) {
             return BaseResult.newError("文件不能为空");
         }
-        String url = fileStorage.upload(file, prefix);
+        String url = fileStorage.upload(file, prefix, true);
         return BaseResult.newSuccess(url);
     }
 }

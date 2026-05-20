@@ -7,6 +7,7 @@ import com.roydon.dear.knowledge.domain.entity.convertor.KnowledgeFileConvertor;
 import com.roydon.dear.knowledge.domain.req.KnowledgeFileRequest;
 import com.roydon.dear.knowledge.domain.resp.KnowledgeFileResp;
 import com.roydon.dear.knowledge.domain.resp.KnowledgeFileTreeNode;
+import com.roydon.dear.knowledge.enums.KnowledgeFileStatus;
 import com.roydon.dear.knowledge.service.IKnowledgeFileService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -60,6 +61,7 @@ public class KnowledgeFileController {
     public BaseResult<KnowledgeFileResp> create(@Valid @RequestBody KnowledgeFileRequest request) {
         log.info("创建文件: request={}", request);
         KnowledgeFileDO entity = knowledgeFileConvertor.toEntity(request);
+        entity.setStatus(KnowledgeFileStatus.INIT);
         knowledgeFileService.save(entity);
         knowledgeFileService.evictTree(entity.getBaseId());
         return BaseResult.newSuccess(knowledgeFileConvertor.toResp(entity));

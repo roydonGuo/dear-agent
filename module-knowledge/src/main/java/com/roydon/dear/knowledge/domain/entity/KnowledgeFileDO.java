@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.roydon.dear.knowledge.enums.KnowledgeFileStatus;
 import lombok.Data;
 
 import java.io.Serializable;
@@ -48,4 +49,15 @@ public class KnowledgeFileDO implements Serializable {
 
     @TableField("update_time")
     private LocalDateTime updateTime;
+
+    /**
+     * 状态
+     * {@see KnowledgeFileStatus}
+     */
+    @TableField("status")
+    private KnowledgeFileStatus status;
+
+    @TableField("processed_storage_path")
+    private String processedStoragePath;
+
 }

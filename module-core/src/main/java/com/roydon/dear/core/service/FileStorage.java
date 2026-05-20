@@ -16,7 +16,7 @@ public interface FileStorage {
      * @param contentType 文件类型
      * @return 文件访问 URL
      */
-    String upload(String bucket, String key, InputStream stream, long size, String contentType);
+    String upload(String bucket, String key, InputStream stream, long size, String contentType, boolean publicUrl);
 
     /**
      * 上传 MultipartFile，自动生成 objectName
@@ -25,7 +25,7 @@ public interface FileStorage {
      * @param keyPrefix 文件路径前缀（如 "images/avatar"），自动拼接 UUID 和扩展名
      * @return 文件访问 URL
      */
-    String upload(MultipartFile file, String keyPrefix);
+    String upload(MultipartFile file, String keyPrefix, boolean publicUrl);
 
     /**
      * 上传 Base64 格式的头像/图片，自动解析并存储
@@ -70,6 +70,8 @@ public interface FileStorage {
      * @return 文件访问 URL
      */
     String getFileUrl(String bucket, String key);
+
+    String getPublicFileUrl(String bucket, String key);
 
     /**
      * 获取文件访问 URL（使用默认存储桶）
