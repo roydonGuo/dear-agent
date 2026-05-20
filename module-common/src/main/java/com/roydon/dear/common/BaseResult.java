@@ -28,9 +28,9 @@ public class BaseResult<T> implements Serializable {
         return new BaseResult<>(CODE_SUCCESS, "", data);
     }
 
-    public static <T> BaseResult<T> newSuccess(String message) {
-        return new BaseResult<>(CODE_SUCCESS, message, null);
-    }
+//    public static <T> BaseResult<T> newSuccess(String message) {
+//        return new BaseResult<>(CODE_SUCCESS, message, null);
+//    }
 
     public static <T> BaseResult<T> newSuccess(T data, String message) {
         return new BaseResult<>(CODE_SUCCESS, message, data);

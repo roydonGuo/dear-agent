@@ -11,7 +11,7 @@ public class SessionDetailVO {
     private String conversationId;
     private String agentType;
     private List<MessageVO> messages;
-    private String fileid;
+    private String fileIds;
 
     // 人设相关
     private String avatar;

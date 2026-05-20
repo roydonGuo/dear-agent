@@ -10,6 +10,7 @@ import com.roydon.dear.common.domain.agent.RoundState;
 import com.roydon.dear.common.domain.agent.SearchResult;
 import com.roydon.dear.common.manager.AgentTaskManager;
 import com.roydon.dear.common.prompts.ReactAgentPrompts;
+import com.roydon.dear.session.entity.ChatConversation;
 import com.roydon.dear.session.entity.ChatMessage;
 import com.roydon.dear.session.service.ChatConversationService;
 import com.roydon.dear.session.service.ChatMessageService;
@@ -85,22 +86,26 @@ public class DearAgent extends BaseAgent {
 
     @Override
     public Flux<String> execute(String conversationId, String question) {
-        return streamInternal(conversationId, question, true);
+        return streamInternal(conversationId, question, true, null);
     }
 
     public Flux<String> stream(String question) {
-        return streamInternal(null, question, true);
+        return streamInternal(null, question, true, null);
     }
 
     public Flux<String> stream(String conversationId, String question) {
-        return streamInternal(conversationId, question, true);
+        return streamInternal(conversationId, question, true, null);
     }
 
     public Flux<String> stream(String conversationId, String question, boolean enableThinking) {
-        return streamInternal(conversationId, question, enableThinking);
+        return streamInternal(conversationId, question, enableThinking, null);
     }
 
-    private Flux<String> streamInternal(String conversationId, String question, boolean enableThinking) {
+    public Flux<String> stream(String conversationId, String question, boolean enableThinking, String fileIds) {
+        return streamInternal(conversationId, question, enableThinking, fileIds);
+    }
+
+    private Flux<String> streamInternal(String conversationId, String question, boolean enableThinking, String fileIds) {
         List<Message> messages = Collections.synchronizedList(new ArrayList<>());
         boolean useMemory = conversationId != null && chatMemory != null;
         if (StringUtils.isBlank(conversationId)) conversationId = UUID.randomUUID().toString();
@@ -130,9 +135,9 @@ public class DearAgent extends BaseAgent {
 
         if (conversationService != null && messageService != null) {
             String title = question.length() > 32 ? question.substring(0, 32) : question;
-            com.roydon.dear.session.entity.ChatConversation conversation = conversationService.getOrCreateBySessionId(conversationId, title);
+            ChatConversation conversation = conversationService.getOrCreateBySessionId(conversationId, title);
             currentConversationNumericId = conversation.getId();
-            ChatMessage userMsg = messageService.saveUserMessage(conversation.getId(), question, null);
+            ChatMessage userMsg = messageService.saveUserMessage(conversation.getId(), question, null,  fileIds);
             currentUserMessageId = userMsg.getId();
         }
 
@@ -169,14 +174,14 @@ public class DearAgent extends BaseAgent {
                 .doFinally(signalType -> {
                     log.info("最终答案: {}", finalAnswerBuffer);
                     log.info("思考过程: {}", thinkingBuffer);
-                    saveSessionResult(finalConversationId, finalAnswerBuffer, thinkingBuffer, agentState, toolCallMessages);
+                    saveSessionResult(finalConversationId, finalAnswerBuffer, thinkingBuffer, agentState, toolCallMessages, fileIds);
                     if (taskManager != null) taskManager.stopTask(finalConversationId);
                     // todo 发送 done 消息
 //                    sink.tryEmitNext(createDoneResponse(finalConversationId1));
                 });
     }
 
-    private void saveSessionResult(String conversationId, StringBuilder finalAnswerBuffer, StringBuilder thinkingBuffer, AgentState agentState, List<JSONObject> toolCallMessages) {
+    private void saveSessionResult(String conversationId, StringBuilder finalAnswerBuffer, StringBuilder thinkingBuffer, AgentState agentState, List<JSONObject> toolCallMessages, String fileIds) {
         if (conversationService != null && messageService != null && currentConversationNumericId != null
                 && currentUserMessageId != null && finalAnswerBuffer.length() > 0) {
             long totalResponseTime = getTotalResponseTime();
@@ -193,7 +198,8 @@ public class DearAgent extends BaseAgent {
                     referenceJson,
                     currentRecommendations,
                     firstResponseTime,
-                    totalResponseTime);
+                    totalResponseTime,
+                    fileIds);
             String lastMsg = finalAnswerBuffer.length() > 64
                     ? finalAnswerBuffer.substring(0, 64) : finalAnswerBuffer.toString();
             conversationService.updateLastMessage(currentConversationNumericId, lastMsg);

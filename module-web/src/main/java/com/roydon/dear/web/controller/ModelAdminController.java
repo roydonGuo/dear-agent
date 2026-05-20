@@ -9,11 +9,16 @@ import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.content.Media;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.MimeTypeUtils;
 import org.springframework.web.bind.annotation.*;
 
+import java.net.URI;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -107,6 +112,19 @@ public class ModelAdminController {
                     float[] helloWorlds = embeddingModel.embed("hello world");
                     log.info("hello world embedding: {}", helloWorlds);
                     return BaseResult.newSuccess("连接成功，模型维度：" + helloWorlds.length);
+                case "multi":
+                    ChatModel multimodalChatModel = provider.createChatModel(cfg);
+                    var userMessage = UserMessage.builder()
+                            .text("请描述这张图片的内容，包括场景、对象、布局、颜色、文字信息，直接输出纯文本描述，不要多余说明。")
+                            .media(List.of(new Media(MimeTypeUtils.IMAGE_PNG, new URI("http://43.240.221.8:9000/dear-agent/chat/a4c913a2d9174d308f4539b4a89ba32e.png"))))
+                            .build();
+                    var response = multimodalChatModel.call(new Prompt(List.of(userMessage)));
+                    String multiResp = response.getResult().getOutput().getText();
+
+                    if (multiResp == null || multiResp.trim().isEmpty()) {
+                        return BaseResult.newSuccess("[无法识别图片内容]");
+                    }
+                    return BaseResult.newSuccess("连接成功, 模型响应: " + multiResp.trim());
                 default:
                     throw new IllegalArgumentException("不支持的模型类别: " + cfg.getCategory());
             }

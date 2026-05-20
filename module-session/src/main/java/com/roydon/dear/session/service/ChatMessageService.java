@@ -16,12 +16,21 @@ public interface ChatMessageService extends IService<ChatMessage> {
      */
     List<ChatMessage> getRecentMessagesForMemory(Long conversationId, int limit);
 
-    ChatMessage saveUserMessage(Long conversationId, String content, String fileid);
+    ChatMessage saveUserMessage(Long conversationId,
+                                String content,
+                                String fileid,
+                                String fileIds);
 
-    ChatMessage saveAssistantMessage(Long conversationId, Long replyId, String content,
-                                     String thinking, String tools, String reference,
-                                     String recommend, Long firstResponseTime,
-                                     Long totalResponseTime);
+    ChatMessage saveAssistantMessage(Long conversationId,
+                                     Long replyId,
+                                     String content,
+                                     String thinking,
+                                     String tools,
+                                     String reference,
+                                     String recommend,
+                                     Long firstResponseTime,
+                                     Long totalResponseTime,
+                                     String fileIds);
 
     void evictByConversationId(Long conversationId);
 }

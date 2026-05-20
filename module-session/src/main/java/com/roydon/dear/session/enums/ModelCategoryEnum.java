@@ -19,6 +19,7 @@ public enum ModelCategoryEnum {
     STT("stt", "语音识别"),
     IMAGE("image", "图像"),
     VIDEO("video", "视频"),
+    MULTI("multi", "多模态"),
     OTHER("other", "其他"),
     ;
 

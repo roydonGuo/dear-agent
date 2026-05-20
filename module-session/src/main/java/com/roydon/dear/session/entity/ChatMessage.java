@@ -37,6 +37,8 @@ public class ChatMessage implements Serializable {
 
     private String fileid;
 
+    private String fileIds;
+
     private Long firstResponseTime;
 
     private Long totalResponseTime;

@@ -95,12 +95,16 @@ public class ChatMessageServiceImpl extends ServiceImpl<ChatMessageMapper, ChatM
     }
 
     @Override
-    public ChatMessage saveUserMessage(Long conversationId, String content, String fileid) {
+    public ChatMessage saveUserMessage(Long conversationId,
+                                       String content,
+                                       String fileid,
+                                       String fileIds) {
         ChatMessage msg = new ChatMessage();
         msg.setConversationId(conversationId);
         msg.setMessageType("user");
         msg.setContent(content);
         msg.setFileid(fileid);
+        msg.setFileIds(fileIds);
         msg.setUseContext("1");
         msg.setDelFlag("0");
         msg.setCreateTime(LocalDateTime.now());
@@ -114,7 +118,7 @@ public class ChatMessageServiceImpl extends ServiceImpl<ChatMessageMapper, ChatM
     public ChatMessage saveAssistantMessage(Long conversationId, Long replyId, String content,
                                             String thinking, String tools, String reference,
                                             String recommend, Long firstResponseTime,
-                                            Long totalResponseTime) {
+                                            Long totalResponseTime, String fileIds) {
         ChatMessage msg = new ChatMessage();
         msg.setConversationId(conversationId);
         msg.setReplyId(replyId);
@@ -125,6 +129,7 @@ public class ChatMessageServiceImpl extends ServiceImpl<ChatMessageMapper, ChatM
         msg.setReference(reference);
         msg.setRecommend(recommend);
         msg.setFileid(null);
+        msg.setFileIds(fileIds);
         msg.setFirstResponseTime(firstResponseTime);
         msg.setTotalResponseTime(totalResponseTime);
         msg.setUseContext("1");

@@ -74,15 +74,25 @@ public class WebSearchReactAgent extends BaseAgent {
             ChatClient.Builder builder = ChatClient.builder(chatModel);
             if (!CollectionUtils.isEmpty(advisors)) builder.defaultAdvisors(advisors);
             this.chatClient = builder.defaultOptions(toolOptions).defaultToolCallbacks(tools).build();
-        } catch (Exception e) { throw new RuntimeException("ChatClient 初始化失败：" + e.getMessage(), e); }
+        } catch (Exception e) {
+            throw new RuntimeException("ChatClient 初始化失败：" + e.getMessage(), e);
+        }
     }
 
     @Override
-    public Flux<String> execute(String conversationId, String question) { return streamInternal(conversationId, question); }
-    public Flux<String> stream(String question) { return streamInternal(null, question); }
-    public Flux<String> stream(String conversationId, String question) { return streamInternal(conversationId, question); }
+    public Flux<String> execute(String conversationId, String question) {
+        return streamInternal(conversationId, question, null);
+    }
 
-    private Flux<String> streamInternal(String conversationId, String question) {
+    public Flux<String> stream(String question) {
+        return streamInternal(null, question, null);
+    }
+
+    public Flux<String> stream(String conversationId, String question, String fileIds) {
+        return streamInternal(conversationId, question, fileIds);
+    }
+
+    private Flux<String> streamInternal(String conversationId, String question, String fileIds) {
         List<Message> messages = Collections.synchronizedList(new ArrayList<>());
         boolean useMemory = conversationId != null && chatMemory != null;
 
@@ -110,7 +120,7 @@ public class WebSearchReactAgent extends BaseAgent {
             String title = question.length() > 32 ? question.substring(0, 32) : question;
             com.roydon.dear.session.entity.ChatConversation conversation = conversationService.getOrCreateBySessionId(conversationId, title);
             currentConversationNumericId = conversation.getId();
-            ChatMessage userMsg = messageService.saveUserMessage(conversation.getId(), question, null);
+            ChatMessage userMsg = messageService.saveUserMessage(conversation.getId(), question, null, fileIds);
             currentUserMessageId = userMsg.getId();
         }
 
@@ -133,18 +143,23 @@ public class WebSearchReactAgent extends BaseAgent {
                         String type = json.getString("type");
                         if ("text".equals(type)) finalAnswerBuffer.append(json.getString("content"));
                         else if ("thinking".equals(type)) thinkingBuffer.append(json.getString("content"));
-                    } catch (Exception e) { finalAnswerBuffer.append(chunk); }
+                    } catch (Exception e) {
+                        finalAnswerBuffer.append(chunk);
+                    }
                 })
-                .doOnCancel(() -> { hasSentFinalResult.set(true); if (taskManager != null) taskManager.stopTask(conversationId); })
+                .doOnCancel(() -> {
+                    hasSentFinalResult.set(true);
+                    if (taskManager != null) taskManager.stopTask(conversationId);
+                })
                 .doFinally(signalType -> {
                     log.info("最终答案: {}", finalAnswerBuffer);
                     log.info("思考过程: {}", thinkingBuffer);
-                    saveSessionResult(conversationId, finalAnswerBuffer, thinkingBuffer, agentState);
+                    saveSessionResult(conversationId, finalAnswerBuffer, thinkingBuffer, agentState, fileIds);
                     if (taskManager != null) taskManager.stopTask(conversationId);
                 });
     }
 
-    private void saveSessionResult(String conversationId, StringBuilder finalAnswerBuffer, StringBuilder thinkingBuffer, AgentState agentState) {
+    private void saveSessionResult(String conversationId, StringBuilder finalAnswerBuffer, StringBuilder thinkingBuffer, AgentState agentState, String fileIds) {
         if (conversationService != null && messageService != null && currentConversationNumericId != null
                 && currentUserMessageId != null && finalAnswerBuffer.length() > 0) {
             long totalResponseTime = getTotalResponseTime();
@@ -156,7 +171,7 @@ public class WebSearchReactAgent extends BaseAgent {
                     currentConversationNumericId, currentUserMessageId,
                     finalAnswerBuffer.toString(), thinkingBuffer.toString(),
                     toolsStr, referenceJson, currentRecommendations,
-                    firstResponseTime, totalResponseTime);
+                    firstResponseTime, totalResponseTime, fileIds);
             String lastMsg = finalAnswerBuffer.length() > 64
                     ? finalAnswerBuffer.substring(0, 64) : finalAnswerBuffer.toString();
             conversationService.updateLastMessage(currentConversationNumericId, lastMsg);
@@ -174,7 +189,12 @@ public class WebSearchReactAgent extends BaseAgent {
                 .publishOn(Schedulers.boundedElastic())
                 .doOnNext(chunk -> processChunk(chunk, sink, state))
                 .doOnComplete(() -> finishRound(messages, sink, state, roundCounter, hasSentFinalResult, finalAnswerBuffer, useMemory, conversationId, agentState, thinkingBuffer))
-                .doOnError(err -> { if (!hasSentFinalResult.get()) { hasSentFinalResult.set(true); sink.tryEmitError(err); } })
+                .doOnError(err -> {
+                    if (!hasSentFinalResult.get()) {
+                        hasSentFinalResult.set(true);
+                        sink.tryEmitError(err);
+                    }
+                })
                 .subscribe();
 
         if (conversationId != null && taskManager != null) taskManager.setDisposable(conversationId, disposable);
@@ -191,7 +211,10 @@ public class WebSearchReactAgent extends BaseAgent {
             for (AssistantMessage.ToolCall incoming : tc) mergeToolCall(state, incoming);
             return;
         }
-        if (text != null) { sink.tryEmitNext(createTextResponse(text)); state.textBuffer.append(text); }
+        if (text != null) {
+            sink.tryEmitNext(createTextResponse(text));
+            state.textBuffer.append(text);
+        }
     }
 
     private void mergeToolCall(RoundState state, AssistantMessage.ToolCall incoming) {
@@ -215,7 +238,10 @@ public class WebSearchReactAgent extends BaseAgent {
                 sink.tryEmitNext(createReferenceResponse(JSON.toJSONString(agentState.searchResults)));
             if (enableRecommendations) {
                 String recommendations = generateRecommendations(conversationId, currentQuestion, finalText);
-                if (recommendations != null) { currentRecommendations = recommendations; sink.tryEmitNext(createRecommendResponse(recommendations)); }
+                if (recommendations != null) {
+                    currentRecommendations = recommendations;
+                    sink.tryEmitNext(createRecommendResponse(recommendations));
+                }
             }
             sink.tryEmitComplete();
             hasSentFinalResult.set(true);
@@ -231,7 +257,8 @@ public class WebSearchReactAgent extends BaseAgent {
         }
 
         executeToolCalls(sink, state.toolCalls, messages, hasSentFinalResult, state, agentState, () -> {
-            if (!hasSentFinalResult.get()) scheduleRound(messages, sink, roundCounter, hasSentFinalResult, finalAnswerBuffer, useMemory, conversationId, agentState, thinkingBuffer);
+            if (!hasSentFinalResult.get())
+                scheduleRound(messages, sink, roundCounter, hasSentFinalResult, finalAnswerBuffer, useMemory, conversationId, agentState, thinkingBuffer);
         });
     }
 
@@ -240,7 +267,9 @@ public class WebSearchReactAgent extends BaseAgent {
         List<Message> newMessages = new ArrayList<>();
         newMessages.add(new SystemMessage(ReactAgentPrompts.getWebSearchPrompt()));
         if (StringUtils.isNotBlank(systemPrompt)) newMessages.add(new SystemMessage(systemPrompt));
-        for (Message msg : messages) { if (!(msg instanceof SystemMessage)) newMessages.add(msg); }
+        for (Message msg : messages) {
+            if (!(msg instanceof SystemMessage)) newMessages.add(msg);
+        }
         newMessages.add(new UserMessage("""
                 你已达到最大推理轮次限制。请基于当前已有的上下文信息，直接给出最终答案。
                 禁止再调用任何工具。如果信息不完整，请合理总结和说明。
@@ -255,7 +284,10 @@ public class WebSearchReactAgent extends BaseAgent {
                 .doOnNext(chunk -> {
                     if (chunk == null || chunk.getResult() == null || chunk.getResult().getOutput() == null) return;
                     String text = chunk.getResult().getOutput().getText();
-                    if (text != null && !hasSentFinalResult.get()) { sink.tryEmitNext(createTextResponse(text)); finalTextBuffer.append(text); }
+                    if (text != null && !hasSentFinalResult.get()) {
+                        sink.tryEmitNext(createTextResponse(text));
+                        finalTextBuffer.append(text);
+                    }
                 })
                 .doOnComplete(() -> {
                     String finalText = finalTextBuffer.toString();
@@ -263,12 +295,18 @@ public class WebSearchReactAgent extends BaseAgent {
                         sink.tryEmitNext(createReferenceResponse(JSON.toJSONString(agentState.searchResults)));
                     if (enableRecommendations) {
                         String recommendations = generateRecommendations(conversationId, currentQuestion, finalText);
-                        if (recommendations != null) { currentRecommendations = recommendations; sink.tryEmitNext(createRecommendResponse(recommendations)); }
+                        if (recommendations != null) {
+                            currentRecommendations = recommendations;
+                            sink.tryEmitNext(createRecommendResponse(recommendations));
+                        }
                     }
                     hasSentFinalResult.set(true);
                     sink.tryEmitComplete();
                 })
-                .doOnError(err -> { hasSentFinalResult.set(true); sink.tryEmitError(err); })
+                .doOnError(err -> {
+                    hasSentFinalResult.set(true);
+                    sink.tryEmitError(err);
+                })
                 .subscribe();
 
         if (conversationId != null && taskManager != null) taskManager.setDisposable(conversationId, disposable);
@@ -282,7 +320,10 @@ public class WebSearchReactAgent extends BaseAgent {
 
         for (AssistantMessage.ToolCall tc : toolCalls) {
             Schedulers.boundedElastic().schedule(() -> {
-                if (hasSentFinalResult.get()) { completeToolCall(completedCount, totalToolCalls, responseMap, toolCalls, messages, onComplete); return; }
+                if (hasSentFinalResult.get()) {
+                    completeToolCall(completedCount, totalToolCalls, responseMap, toolCalls, messages, onComplete);
+                    return;
+                }
 
                 String toolName = tc.name();
                 String argsJson = tc.arguments();
@@ -346,7 +387,9 @@ public class WebSearchReactAgent extends BaseAgent {
                 String content = getSafe(item, "content");
                 if (url != null && !url.isBlank()) state.searchResults.add(new SearchResult(url, title, content));
             }
-        } catch (Exception e) { log.warn("解析 tavily 搜索结果失败: {}", e.getMessage()); }
+        } catch (Exception e) {
+            log.warn("解析 tavily 搜索结果失败: {}", e.getMessage());
+        }
     }
 
     private String getSafe(JsonNode node, String field) {
@@ -364,29 +407,91 @@ public class WebSearchReactAgent extends BaseAgent {
         return tools.stream().filter(t -> t.getToolDefinition().name().equals(name)).findFirst().orElse(null);
     }
 
-    public void setMaxRounds(int maxRounds) { this.maxRounds = maxRounds; }
+    public void setMaxRounds(int maxRounds) {
+        this.maxRounds = maxRounds;
+    }
 
-    public static Builder builder() { return new Builder(); }
+    public static Builder builder() {
+        return new Builder();
+    }
 
     public static class Builder {
-        private String name; private ChatModel chatModel; private List<ToolCallback> tools; private String systemPrompt = "";
-        private int maxReflectionRounds; private int maxRounds; private List<Advisor> advisors;
-        private ChatMemory chatMemory; private ChatConversationService conversationService;
-        private ChatMessageService messageService; private AgentTaskManager taskManager;
+        private String name;
+        private ChatModel chatModel;
+        private List<ToolCallback> tools;
+        private String systemPrompt = "";
+        private int maxReflectionRounds;
+        private int maxRounds;
+        private List<Advisor> advisors;
+        private ChatMemory chatMemory;
+        private ChatConversationService conversationService;
+        private ChatMessageService messageService;
+        private AgentTaskManager taskManager;
 
-        public Builder chatMemory(ChatMemory chatMemory) { this.chatMemory = chatMemory; return this; }
-        public Builder conversationService(ChatConversationService conversationService) { this.conversationService = conversationService; return this; }
-        public Builder messageService(ChatMessageService messageService) { this.messageService = messageService; return this; }
-        public Builder taskManager(AgentTaskManager taskManager) { this.taskManager = taskManager; return this; }
-        public Builder name(String name) { this.name = name; return this; }
-        public Builder chatModel(ChatModel chatModel) { this.chatModel = chatModel; return this; }
-        public Builder tools(ToolCallback... tools) { this.tools = Arrays.asList(tools); return this; }
-        public Builder tools(List<ToolCallback> tools) { this.tools = tools; return this; }
-        public Builder advisors(List<Advisor> advisors) { this.advisors = advisors; return this; }
-        public Builder advisors(Advisor... advisors) { this.advisors = Arrays.asList(advisors); return this; }
-        public Builder systemPrompt(String systemPrompt) { this.systemPrompt = systemPrompt; return this; }
-        public Builder maxReflectionRounds(int maxReflectionRounds) { this.maxReflectionRounds = maxReflectionRounds; return this; }
-        public Builder maxRounds(int maxRounds) { this.maxRounds = maxRounds; return this; }
+        public Builder chatMemory(ChatMemory chatMemory) {
+            this.chatMemory = chatMemory;
+            return this;
+        }
+
+        public Builder conversationService(ChatConversationService conversationService) {
+            this.conversationService = conversationService;
+            return this;
+        }
+
+        public Builder messageService(ChatMessageService messageService) {
+            this.messageService = messageService;
+            return this;
+        }
+
+        public Builder taskManager(AgentTaskManager taskManager) {
+            this.taskManager = taskManager;
+            return this;
+        }
+
+        public Builder name(String name) {
+            this.name = name;
+            return this;
+        }
+
+        public Builder chatModel(ChatModel chatModel) {
+            this.chatModel = chatModel;
+            return this;
+        }
+
+        public Builder tools(ToolCallback... tools) {
+            this.tools = Arrays.asList(tools);
+            return this;
+        }
+
+        public Builder tools(List<ToolCallback> tools) {
+            this.tools = tools;
+            return this;
+        }
+
+        public Builder advisors(List<Advisor> advisors) {
+            this.advisors = advisors;
+            return this;
+        }
+
+        public Builder advisors(Advisor... advisors) {
+            this.advisors = Arrays.asList(advisors);
+            return this;
+        }
+
+        public Builder systemPrompt(String systemPrompt) {
+            this.systemPrompt = systemPrompt;
+            return this;
+        }
+
+        public Builder maxReflectionRounds(int maxReflectionRounds) {
+            this.maxReflectionRounds = maxReflectionRounds;
+            return this;
+        }
+
+        public Builder maxRounds(int maxRounds) {
+            this.maxRounds = maxRounds;
+            return this;
+        }
 
         public WebSearchReactAgent build() {
             if (chatModel == null) throw new IllegalArgumentException("chatModel 不能为空！");

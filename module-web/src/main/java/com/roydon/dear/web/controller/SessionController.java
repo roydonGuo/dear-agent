@@ -1,10 +1,12 @@
 package com.roydon.dear.web.controller;
 
+import cn.hutool.core.collection.CollUtil;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.roydon.dear.common.BaseResult;
 import com.roydon.dear.prompt.entity.AiPrompt;
 import com.roydon.dear.prompt.service.AiPromptService;
+import com.roydon.dear.session.entity.AiChatFile;
 import com.roydon.dear.session.entity.ChatConversation;
 import com.roydon.dear.session.entity.ChatMessage;
 import com.roydon.dear.session.req.SessionEditRequest;
@@ -14,6 +16,7 @@ import com.roydon.dear.session.resp.SessionDetailVO;
 import com.roydon.dear.session.resp.SessionListVO;
 import com.roydon.dear.session.service.ChatConversationService;
 import com.roydon.dear.session.service.ChatMessageService;
+import com.roydon.dear.session.service.IAiChatFileService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -23,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -36,6 +40,7 @@ public class SessionController {
     private final ChatConversationService conversationService;
     private final ChatMessageService messageService;
     private final AiPromptService promptService;
+    private final IAiChatFileService aiChatFileService;
 
     @GetMapping("/{conversationId}")
     @Operation(summary = "查询会话的对话列表", description = "根据conversationId查询会话中的对话列表详情")
@@ -136,11 +141,18 @@ public class SessionController {
         MessageVO current = null;
         for (ChatMessage msg : messages) {
             if ("user".equals(msg.getMessageType())) {
+                // 查询关联的文件
+                String fileIds = msg.getFileIds();
+                List<AiChatFile> chatFileList = List.of();
+                if (fileIds != null && !fileIds.isEmpty()) {
+                     chatFileList = aiChatFileService.getListByIds(fileIds);
+                }
                 current = MessageVO.builder()
                         .id(msg.getId())
                         .question(msg.getContent())
                         .createTime(msg.getCreateTime())
                         .fileid(msg.getFileid())
+                        .chatFileList(chatFileList)
                         .build();
                 result.add(current);
             } else if ("assistant".equals(msg.getMessageType())) {
