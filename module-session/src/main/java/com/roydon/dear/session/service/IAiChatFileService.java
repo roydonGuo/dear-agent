@@ -15,7 +15,6 @@ import java.util.List;
  */
 public interface IAiChatFileService extends IService<AiChatFile> {
 
-    List<AiChatFile> getListByIds(List<Long> ids);
     List<AiChatFile> getListByIds(String ids);
 
 }

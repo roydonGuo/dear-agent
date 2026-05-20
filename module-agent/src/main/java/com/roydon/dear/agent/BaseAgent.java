@@ -4,6 +4,7 @@ import com.alibaba.fastjson2.JSON;
 import com.roydon.dear.common.AgentResponse;
 import com.roydon.dear.common.manager.AgentTaskManager;
 import com.roydon.dear.common.prompts.ReactAgentPrompts;
+import com.roydon.dear.session.entity.ChatConversation;
 import com.roydon.dear.session.entity.ChatMessage;
 import com.roydon.dear.session.service.ChatConversationService;
 import com.roydon.dear.session.service.ChatMessageService;
@@ -84,7 +85,7 @@ public abstract class BaseAgent {
             log.warn("conversationService is null, cannot load chat memory");
             return MessageWindowChatMemory.builder().maxMessages(maxMessages).build();
         }
-        com.roydon.dear.session.entity.ChatConversation conversation = conversationService.getBySessionId(sessionId);
+        ChatConversation conversation = conversationService.getBySessionId(sessionId);
         if (conversation == null) {
             return MessageWindowChatMemory.builder().maxMessages(maxMessages).build();
         }

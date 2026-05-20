@@ -158,10 +158,7 @@ public class AgentController {
         }
         // 给系统提示词拼接文件信息
         if (StringUtils.isNotBlank(fileIds)) {
-            String[] split = fileIds.split(",");
-            // 转为 list<Long>
-            List<Long> fileIdsList = Arrays.stream(split).map(Long::parseLong).toList();
-            List<AiChatFile> chatFileList = aiChatFileService.getListByIds(fileIdsList);
+            List<AiChatFile> chatFileList = aiChatFileService.getListByIds(fileIds);
             AtomicReference<String> prompt = new AtomicReference<>("""
                     # 用户携带了以下文件描述信息：
                     """);
