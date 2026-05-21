@@ -40,7 +40,7 @@ public class MarkdownFileProcessStrategy implements FileProcessStrategy {
     @Override
     public void processFile(KnowledgeFileDO fileDO, InputStream inputStream) {
         // 0.开始处理md文件
-
+        log.info("开始处理 Markdown 文件: {}", fileDO.getName());
         // 1.解析图片
 
         // 2.替换原图片
