@@ -1,59 +1,35 @@
-package com.roydon.llm.rag.config;
+package com.roydon.dear.knowledge.rag.config;
 
-
+import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+@Data
 @ConfigurationProperties(prefix = ElasticSearchProperties.PREFIX)
 public class ElasticSearchProperties {
     public static final String PREFIX = "elasticsearch";
 
     private String host;
 
-    private String baseUrl;
-
-    private String modelName;
-
     private String apiKey;
 
-    private int dimensions;
+    /**
+     * Vector dimension for embeddings.
+     */
+    private int dimensions = 1024;
 
-    public String getHost() {
-        return host;
-    }
+    /**
+     * Similarity function for vector search: cosine, dot_product, l2_norm.
+     */
+    private String similarity = "cosine";
 
-    public void setHost(String host) {
-        this.host = host;
-    }
+    /**
+     * Elasticsearch index name for vector storage.
+     */
+    private String indexName = "knowledge-vector";
 
-    public String getBaseUrl() {
-        return baseUrl;
-    }
+    /**
+     * Whether to initialize the schema (index mapping) on startup.
+     */
+    private boolean initializeSchema = true;
 
-    public void setBaseUrl(String baseUrl) {
-        this.baseUrl = baseUrl;
-    }
-
-    public String getModelName() {
-        return modelName;
-    }
-
-    public void setModelName(String modelName) {
-        this.modelName = modelName;
-    }
-
-    public String getApiKey() {
-        return apiKey;
-    }
-
-    public void setApiKey(String apiKey) {
-        this.apiKey = apiKey;
-    }
-
-    public int getDimensions() {
-        return dimensions;
-    }
-
-    public void setDimensions(int dimensions) {
-        this.dimensions = dimensions;
-    }
 }
