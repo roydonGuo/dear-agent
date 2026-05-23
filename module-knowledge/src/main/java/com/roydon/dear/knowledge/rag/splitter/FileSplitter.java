@@ -7,7 +7,12 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
-public interface DocumentSplitter {
+/**
+ * spring ai的文档解析不太行
+ * todo 后续优化使用langchain4j的文档解析
+ */
+public interface FileSplitter {
+
     List<Document> split(Document var1);
 
     default List<Document> splitAll(List<Document> documents) {

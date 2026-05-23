@@ -23,7 +23,7 @@ public interface FileProcessStrategy {
      * 3. 转换后的文档保存在minio上
      * 3. 更新文档状态和转换后的 URL
      */
-    public void processFile(KnowledgeFileDO fileDO, InputStream inputStream);
+    public KnowledgeFileDO processFile(KnowledgeFileDO fileDO);
 
 }
 

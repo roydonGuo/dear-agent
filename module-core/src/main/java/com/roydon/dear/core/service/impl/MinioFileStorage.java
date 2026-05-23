@@ -2,19 +2,14 @@ package com.roydon.dear.core.service.impl;
 
 import com.roydon.dear.core.service.FileStorage;
 import com.roydon.dear.core.service.FileUploadResult;
-import io.minio.BucketExistsArgs;
-import io.minio.GetObjectArgs;
-import io.minio.GetPresignedObjectUrlArgs;
-import io.minio.MakeBucketArgs;
-import io.minio.MinioClient;
-import io.minio.PutObjectArgs;
-import io.minio.RemoveObjectArgs;
+import io.minio.*;
 import io.minio.http.Method;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.util.Base64;
 import java.util.UUID;
@@ -170,5 +165,13 @@ public class MinioFileStorage implements FileStorage {
         } catch (Exception e) {
             throw new RuntimeException("存储桶检查/创建失败: " + e.getMessage());
         }
+    }
+
+    @Override
+    public InputStream downloadFile(String objectName) throws Exception {
+        return minioClient.getObject(GetObjectArgs.builder()
+                .bucket(defaultBucket)
+                .object(objectName)
+                .build());
     }
 }

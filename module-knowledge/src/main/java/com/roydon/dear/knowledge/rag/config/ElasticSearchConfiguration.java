@@ -40,7 +40,7 @@ public class ElasticSearchConfiguration {
         ElasticsearchVectorStoreOptions options = new ElasticsearchVectorStoreOptions();
         options.setIndexName(properties.getIndexName());
         options.setDimensions(properties.getDimensions());
-        options.setSimilarity(SimilarityFunction.valueOf(properties.getSimilarity().toLowerCase()));
+        options.setSimilarity(SimilarityFunction.valueOf(properties.getSimilarity().toUpperCase()));
 
         return ElasticsearchVectorStore.builder(restClient, embeddingModel)
                 .options(options)

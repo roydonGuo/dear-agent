@@ -1,5 +1,6 @@
 package com.roydon.dear.knowledge.process;
 
+import com.roydon.dear.common.exception.BusinessException;
 import com.roydon.dear.knowledge.domain.entity.KnowledgeFileDO;
 import com.roydon.dear.knowledge.enums.FileMineType;
 import lombok.extern.slf4j.Slf4j;
@@ -31,8 +32,10 @@ public class PdfFileProcessStrategy implements FileProcessStrategy {
      * 处理文档转换 - pdf 格式
      */
     @Override
-    public void processFile(KnowledgeFileDO fileDO, InputStream inputStream) {
-
+    public KnowledgeFileDO processFile(KnowledgeFileDO fileDO) {
+        log.info("开始处理 pdf 文件: {}", fileDO.getName());
+        // todo
+        throw new BusinessException("暂不支持pdf文件处理");
     }
 
 }

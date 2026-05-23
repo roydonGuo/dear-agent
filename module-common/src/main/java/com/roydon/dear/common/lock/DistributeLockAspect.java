@@ -1,4 +1,4 @@
-package com.roydon.llm.infra.lock;
+package com.roydon.dear.common.lock;
 
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;

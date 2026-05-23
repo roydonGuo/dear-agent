@@ -1,5 +1,7 @@
 package com.roydon.dear.core.service;
 
+import io.minio.GetObjectArgs;
+import io.minio.GetObjectResponse;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
@@ -80,4 +82,9 @@ public interface FileStorage {
      * @return 文件访问 URL
      */
     String getFileUrl(String key);
+
+    /**
+     * 下载文件
+     */
+    InputStream downloadFile(String objectName) throws Exception;
 }

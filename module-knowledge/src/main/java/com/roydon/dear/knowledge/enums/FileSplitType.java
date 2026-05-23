@@ -1,6 +1,14 @@
-package com.roydon.llm.document.constant;
+package com.roydon.dear.knowledge.enums;
 
-public enum SplitType {
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+
+/**
+ * 文件切分类型枚举
+ */
+@Getter
+@AllArgsConstructor
+public enum FileSplitType {
 
     /**
      * 按长度切分
@@ -25,5 +33,6 @@ public enum SplitType {
     /**
      * 按分隔符切分
      */
-    SEPARATOR;
+    SEPARATOR,
+    ;
 }

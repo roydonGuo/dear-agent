@@ -70,12 +70,16 @@
             <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
             <version>${mybatis.version}</version>
         </dependency>
-        <!-- 社区版spring ai 集成skill和multi agent：https://github.com/spring-ai-community/spring-ai-agent-utils -->
-<!--        <dependency>-->
-<!--            <groupId>org.springaicommunity</groupId>-->
-<!--            <artifactId>spring-ai-agent-utils</artifactId>-->
-<!--            <version>0.7.0</version>-->
-<!--        </dependency>-->
+        <dependency>
+            <groupId>org.aspectj</groupId>
+            <artifactId>aspectjrt</artifactId>
+            <version>1.9.20.1</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
+            <version>3.5.6</version>
+        </dependency>
     </dependencies>
 
 </project>

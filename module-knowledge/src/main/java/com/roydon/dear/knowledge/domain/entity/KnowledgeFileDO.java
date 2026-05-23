@@ -32,6 +32,10 @@ public class KnowledgeFileDO implements Serializable {
     @TableField("file_type")
     private String fileType;
 
+    /**
+     * 文件类型
+     * {@see FileMineType}
+     */
     @TableField("mine_type")
     private String mineType;
 

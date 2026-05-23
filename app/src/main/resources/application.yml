@@ -105,6 +105,11 @@ jetcache:
       valueDecoder: java
       defaultExpireInMillis: 5000
 
+elasticsearch:
+  host: http://127.0.0.1:9201
+  api-key: ZUlhRUVaNEI3V0lLbFdUcWFvYUU6OHlHOUdaRGRRUmlBSURlTXZGejE5dw==
+  dimensions: 1536
+
 logging:
   level:
     com.roydon.dear: debug

@@ -1,25 +1,21 @@
-package com.roydon.llm.rag.modules.splitter;
+package com.roydon.dear.knowledge.rag.splitter;
 
-
-import com.roydon.llm.infra.snowflake.SnowflakeIdGenerator;
-import dev.langchain4j.data.document.Document;
-import dev.langchain4j.data.document.DocumentSplitter;
-import dev.langchain4j.data.document.Metadata;
-import dev.langchain4j.data.segment.TextSegment;
+import cn.hutool.core.lang.generator.SnowflakeGenerator;
+import org.springframework.ai.document.Document;
 
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static com.roydon.llm.rag.constant.MetadataKeyConstant.*;
+import static com.roydon.dear.knowledge.constant.MetadataKeyConstant.*;
 
 /**
  * Markdown文档分割器，基于标题层级进行文档分段
  * 支持保留元数据、父子分段关系等高级特性
  *
- * @author andyflury （https://github.com/langchain4j/langchain4j/issues/574 ）
+ * @author andyflury （https://github.com/langchain4j/langchain4j/issues/574）
  * @author Hollis, 增加对父子分段的支持
  */
-public class MarkdownHeaderParentTextSplitter implements DocumentSplitter {
+public class MarkdownHeaderParentTextSplitter implements FileSplitter {
 
     private static final Map<String, String> DEFAULT_HEADERS_TO_SPLIT = new HashMap<>();
 
@@ -57,6 +53,8 @@ public class MarkdownHeaderParentTextSplitter implements DocumentSplitter {
      */
     private int overlap;
 
+    private SnowflakeGenerator snowflakeGenerator;
+
     /**
      * 构造函数
      *
@@ -91,20 +89,20 @@ public class MarkdownHeaderParentTextSplitter implements DocumentSplitter {
         this.stripHeaders = stripHeaders;
         this.chunkSize = chunkSize;
         this.overlap = overlap;
+        this.snowflakeGenerator = new SnowflakeGenerator();
     }
 
     @Override
-    public List<TextSegment> split(Document document) {
-        System.out.println("开始解析Markdown文档...");
+    public List<Document> split(Document document) {
         // 移除文档中所有空行
-        String text = Arrays.stream(document.text().split("\n"))
+        String text = Arrays.stream(Objects.requireNonNull(document.getText()).split("\n"))
                 .filter(line -> !line.trim().isEmpty())
                 .collect(Collectors.joining("\n"));
 
-        List<TextSegment> result = new ArrayList<>();
-        List<DocumentWithMetadata> segments = splitWithMetadata(text, document.metadata().toMap());
+        List<Document> result = new ArrayList<>();
+        List<DocumentWithMetadata> segments = splitWithMetadata(text, document.getMetadata());
         for (DocumentWithMetadata segment : segments) {
-            result.add(new TextSegment(segment.getContent(), Metadata.from(segment.getMetadata())));
+            result.add(new Document(segment.getContent(), segment.getMetadata()));
         }
 
         return result;
@@ -117,16 +115,16 @@ public class MarkdownHeaderParentTextSplitter implements DocumentSplitter {
      * @return 分割后的文本片段列表
      */
 
-    public List<TextSegment> splitText(String text) {
+    public List<Document> splitText(String text) {
         // 移除文本中所有空行
         String filteredText = Arrays.stream(text.split("\n"))
                 .filter(line -> !line.trim().isEmpty())
                 .collect(Collectors.joining("\n"));
 
-        List<TextSegment> result = new ArrayList<>();
+        List<Document> result = new ArrayList<>();
         List<DocumentWithMetadata> segments = splitWithMetadata(filteredText, new HashMap<>());
         for (DocumentWithMetadata segment : segments) {
-            result.add(new TextSegment(segment.getContent(), Metadata.from(segment.getMetadata())));
+            result.add(new Document(segment.getContent(), segment.getMetadata()));
         }
 
         return result;
@@ -201,8 +199,8 @@ public class MarkdownHeaderParentTextSplitter implements DocumentSplitter {
                             initialMetadata.put(name, headerType.getData());
                             initialMetadata.put(HEADER_LEVEL, currentHeaderLevel);
                             // 为每个分段生成唯一ID，用于后续建立父子关系
-                            String currentChunkId = SnowflakeIdGenerator.getInstance().nextIdStr();
-                            initialMetadata.put(CHUNK_ID, currentChunkId);
+                            Long next = snowflakeGenerator.next();
+                            initialMetadata.put(CHUNK_ID, next);
                         }
 
                         // 遇到新标题时，保存之前累积的内容
@@ -316,7 +314,7 @@ public class MarkdownHeaderParentTextSplitter implements DocumentSplitter {
                 // 1. 首先保留完整分片，标记为跳过embedding
                 Map<String, Object> fullMetadata = new HashMap<>(segment.getMetadata());
 
-                String parentChunkId = SnowflakeIdGenerator.getInstance().nextIdStr();
+                Long parentChunkId = snowflakeGenerator.next();
 
                 fullMetadata.put(CHUNK_ID, parentChunkId);
                 fullMetadata.put(SKIP_EMBEDDING, 1);
@@ -330,7 +328,7 @@ public class MarkdownHeaderParentTextSplitter implements DocumentSplitter {
 
                     // 复制元数据并进行更新
                     Map<String, Object> subMetadata = new HashMap<>(segment.getMetadata());
-                    subMetadata.put(CHUNK_ID, SnowflakeIdGenerator.getInstance().nextIdStr());
+                    subMetadata.put(CHUNK_ID, snowflakeGenerator.next());
                     subMetadata.put(PARENT_CHUNK_ID, parentChunkId);
 
                     result.add(new DocumentWithMetadata(subContent, subMetadata));
@@ -345,7 +343,6 @@ public class MarkdownHeaderParentTextSplitter implements DocumentSplitter {
         }
         return result;
     }
-
 
     /**
      * 内部类：表示带有元数据的文本行

@@ -1,4 +1,4 @@
-package com.roydon.llm.infra.lock;
+package com.roydon.dear.common.lock;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

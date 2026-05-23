@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.roydon.dear.knowledge.mapper.KnowledgeFileSegmentMapper">
+
+    <resultMap type="com.roydon.dear.knowledge.domain.entity.KnowledgeFileSegmentDO" id="KnowledgeFileSegmentMap">
+        <result property="id" column="id" jdbcType="INTEGER"/>
+        <result property="fileId" column="file_id" jdbcType="INTEGER"/>
+        <result property="text" column="text" jdbcType="VARCHAR"/>
+        <result property="chunkId" column="chunk_id" jdbcType="VARCHAR"/>
+        <result property="chunkOrder" column="chunk_order" jdbcType="INTEGER"/>
+        <result property="metadata" column="metadata" jdbcType="VARCHAR"/>
+        <result property="embeddingId" column="embedding_id" jdbcType="VARCHAR"/>
+        <result property="status" column="status" jdbcType="VARCHAR"/>
+        <result property="skipEmbedding" column="skip_embedding" jdbcType="INTEGER"/>
+        <result property="createdAt" column="created_at" jdbcType="TIMESTAMP"/>
+        <result property="updatedAt" column="updated_at" jdbcType="TIMESTAMP"/>
+    </resultMap>
+
+
+</mapper>
+

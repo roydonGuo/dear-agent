@@ -78,4 +78,13 @@ public enum FileMineType {
 
     private final String value;
 
+    public static FileMineType fromValue(String value) {
+        for (FileMineType type : FileMineType.values()) {
+            if (type.value.equals(value)) {
+                return type;
+            }
+        }
+        return null;
+    }
+
 }

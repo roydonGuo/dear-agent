@@ -41,7 +41,6 @@ public class KnowledgeFileServiceImpl extends ServiceImpl<KnowledgeFileMapper, K
 
     private final KnowledgeFileConvertor knowledgeFileConvertor;
     private final FileStorage fileStorage;
-    private final FileProcessStrategyFactory fileProcessStrategyFactory;
 
     @Override
     @Cached(name = CACHE_NAME + CACHE_NAME_TREE, key = "#baseId", cacheType = CacheType.BOTH, cacheNullValue = true, expire = 60, localExpire = 10, timeUnit = TimeUnit.MINUTES)
@@ -125,15 +124,15 @@ public class KnowledgeFileServiceImpl extends ServiceImpl<KnowledgeFileMapper, K
                 entity.getId(), originalFilename, file.getSize(), storagePath);
 
         // todo 文档分段/向量化
-        FileProcessStrategy fileProcessStrategy = fileProcessStrategyFactory.get(FileMineType.valueOf(mineType));
-        if (fileProcessStrategy != null) {
-            fileProcessStrategy.processFile(entity, new java.io.ByteArrayInputStream(fileBytes));
-        }
-
-        log.info("Knowledge file processed: id={}, name={}",
-                entity.getId(), originalFilename);
-        // 更新文档状态
-        entity.setStatus(KnowledgeFileStatus.CONVERTED);
+//        FileProcessStrategy fileProcessStrategy = fileProcessStrategyFactory.get(FileMineType.valueOf(mineType));
+//        if (fileProcessStrategy != null) {
+//            fileProcessStrategy.processFile(entity, new java.io.ByteArrayInputStream(fileBytes));
+//        }
+//
+//        log.info("Knowledge file processed: id={}, name={}",
+//                entity.getId(), originalFilename);
+//        // 更新文档状态
+//        entity.setStatus(KnowledgeFileStatus.CONVERTED);
 //        entity.setConvertedDocUrl(fileUrl);
 //        result = knowledgeDocumentService.updateById(document);
 

@@ -1,27 +1,36 @@
-package com.roydon.llm.reader;
+package com.roydon.dear.knowledge.rag.reader;
 
+import com.roydon.dear.common.exception.BusinessException;
+import com.roydon.dear.core.service.FileStorage;
+import com.roydon.dear.knowledge.domain.entity.KnowledgeFileDO;
+import com.roydon.dear.knowledge.enums.FileMineType;
+import lombok.RequiredArgsConstructor;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.reader.markdown.MarkdownDocumentReader;
 import org.springframework.ai.reader.markdown.config.MarkdownDocumentReaderConfig;
-import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
 import org.springframework.stereotype.Service;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.List;
 
 @Service
-public class MarkdownReaderStrategy implements DocumentReaderStrategy {
-    @Override
-    public boolean supports(File file) {
+@RequiredArgsConstructor
+public class MarkdownReaderStrategy implements FileReaderStrategy {
+    private final FileStorage fileStorage;
 
-        String name = file.getName().toLowerCase();
-        return name.endsWith(".md");
+    @Override
+    public boolean supports(FileMineType mineType) {
+        return FileMineType.TEXT_MARKDOWN.equals(mineType);
     }
 
     @Override
-    public List<Document> read(File file) throws IOException {
+    public List<Document> read(KnowledgeFileDO fileDO) throws IOException {
+        String processedStoragePath = fileDO.getProcessedStoragePath();
+        if (processedStoragePath == null || processedStoragePath.isEmpty()) {
+            throw new BusinessException("请先处理文件");
+        }
         // 读取配置
         MarkdownDocumentReaderConfig config = MarkdownDocumentReaderConfig.builder()
                 // 水平线分割生成新文档
@@ -31,9 +40,9 @@ public class MarkdownReaderStrategy implements DocumentReaderStrategy {
                 // 不包含引用
                 .withIncludeBlockquote(false)
                 // 添加文件名元数据
-                .withAdditionalMetadata("filename", file.getName())
+                .withAdditionalMetadata("filename", fileDO.getName())
                 .build();
-        Resource resource = new FileSystemResource(file);
-        return new MarkdownDocumentReader(resource,config).get();
+        Resource resource = new UrlResource(fileStorage.getFileUrl(processedStoragePath));
+        return new MarkdownDocumentReader(resource, config).get();
     }
 }

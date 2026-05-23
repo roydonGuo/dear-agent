@@ -5,6 +5,7 @@ import com.roydon.dear.session.entity.AiChatFile;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 
+import java.net.URISyntaxException;
 import java.util.List;
 
 /**

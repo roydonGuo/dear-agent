@@ -1,4 +1,4 @@
-package com.roydon.llm.infra.lock;
+package com.roydon.dear.common.lock;
 
 /**
  * 分布式锁异常

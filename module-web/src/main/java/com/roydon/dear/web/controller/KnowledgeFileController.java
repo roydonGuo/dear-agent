@@ -7,7 +7,11 @@ import com.roydon.dear.knowledge.domain.entity.convertor.KnowledgeFileConvertor;
 import com.roydon.dear.knowledge.domain.req.KnowledgeFileRequest;
 import com.roydon.dear.knowledge.domain.resp.KnowledgeFileResp;
 import com.roydon.dear.knowledge.domain.resp.KnowledgeFileTreeNode;
+import com.roydon.dear.knowledge.enums.FileMineType;
 import com.roydon.dear.knowledge.enums.KnowledgeFileStatus;
+import com.roydon.dear.knowledge.process.FileProcessComponent;
+import com.roydon.dear.knowledge.process.FileProcessStrategy;
+import com.roydon.dear.knowledge.process.FileProcessStrategyFactory;
 import com.roydon.dear.knowledge.service.IKnowledgeFileService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -36,6 +40,8 @@ public class KnowledgeFileController {
 
     private final IKnowledgeFileService knowledgeFileService;
     private final KnowledgeFileConvertor knowledgeFileConvertor;
+    private final FileProcessStrategyFactory fileProcessStrategyFactory;
+    private final FileProcessComponent fileProcessComponent;
 
     @GetMapping("/tree")
     @Operation(summary = "查询文件树", description = "根据知识库ID查询完整的文件树结构")
@@ -141,5 +147,18 @@ public class KnowledgeFileController {
         knowledgeFileService.evictById(id);
         knowledgeFileService.evictTree(entity.getBaseId());
         return BaseResult.newSuccess("删除成功");
+    }
+
+    @PostMapping("/embed/{fileId}")
+    public BaseResult<String> processFile(@PathVariable Long fileId) {
+        KnowledgeFileDO entity = knowledgeFileService.getById(fileId);
+        if (entity == null) {
+            throw new BusinessException("文件不存在");
+        }
+        if (entity.getFileType().equals("folder")) {
+            throw new BusinessException("不可操作文件夹，请选择文件！");
+        }
+        fileProcessComponent.processFile(entity);
+        return BaseResult.newSuccess();
     }
 }
