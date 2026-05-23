@@ -36,7 +36,7 @@ public class EmbedProcess {
     private final IKnowledgeFileService knowledgeFileService;
     private final VectorStore vectorStore;
 
-    private static final int EMBEDDING_BATCH_SIZE = 10;
+    private static final int EMBEDDING_BATCH_SIZE = 10;  // DashScope 的 text-embedding-v4 API 每次最多只能嵌入 10 条文本
 
     public boolean embedAndStore(KnowledgeFileDO fileDO) {
         if (fileDO.getStatus() == KnowledgeFileStatus.VECTOR_STORED) {

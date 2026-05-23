@@ -108,7 +108,7 @@ jetcache:
 elasticsearch:
   host: http://127.0.0.1:9201
   api-key: Z2tHQlZaNEJ4UXA4Y0VlYUdSanQ6VzhZTnJ0MzlTY21oVkpvdnYwTTRNZw==
-  dimensions: 1536
+  dimensions: 1024
   initialize-schema: false
 
 logging:
