@@ -3,7 +3,7 @@ package com.roydon.dear.knowledge.rag.config;
 import com.roydon.dear.model.registry.ModelRegistry;
 import com.roydon.dear.session.enums.ModelCategoryEnum;
 import org.apache.http.HttpHost;
-import org.apache.http.message.BasicHeader;
+import org.apache.http.HttpRequestInterceptor;
 import org.elasticsearch.client.RestClient;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.vectorstore.elasticsearch.ElasticsearchVectorStore;
@@ -15,8 +15,6 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
-
-import java.util.Collections;
 
 @Configuration
 @EnableConfigurationProperties(ElasticSearchProperties.class)
@@ -34,9 +32,9 @@ public class ElasticSearchConfiguration {
         return RestClient
                 .builder(HttpHost.create(properties.getHost()))
                 .setHttpClientConfigCallback(httpClientBuilder -> httpClientBuilder
-                        .setDefaultHeaders(Collections.singleton(
-                                new BasicHeader("Authorization", "ApiKey " + properties.getApiKey())
-                        )))
+                        .addInterceptorFirst((HttpRequestInterceptor) (request, context) ->
+                                request.addHeader("Authorization", "ApiKey " + properties.getApiKey())
+                        ))
                 .build();
     }
 

@@ -40,7 +40,6 @@ public class KnowledgeFileController {
 
     private final IKnowledgeFileService knowledgeFileService;
     private final KnowledgeFileConvertor knowledgeFileConvertor;
-    private final FileProcessStrategyFactory fileProcessStrategyFactory;
     private final FileProcessComponent fileProcessComponent;
 
     @GetMapping("/tree")
