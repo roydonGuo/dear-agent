@@ -1,9 +1,12 @@
 package com.roydon.dear.knowledge.rag.config;
 
+import com.roydon.dear.model.registry.ModelRegistry;
 import com.roydon.dear.session.enums.ModelCategoryEnum;
-import org.apache.http.HttpHost;
-import org.apache.http.message.BasicHeader;
+import org.apache.hc.client5.http.impl.async.HttpAsyncClientBuilder;
+import org.apache.hc.core5.http.HttpHost;
+import org.apache.hc.core5.http.message.BasicHeader;
 import org.elasticsearch.client.RestClient;
+import org.elasticsearch.client.RestClientBuilder;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.vectorstore.elasticsearch.ElasticsearchVectorStore;
 import org.springframework.ai.vectorstore.elasticsearch.ElasticsearchVectorStoreOptions;
@@ -15,7 +18,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 
-import com.roydon.dear.model.registry.ModelRegistry;
+import java.util.List;
 
 @Configuration
 @EnableConfigurationProperties(ElasticSearchProperties.class)
@@ -32,8 +35,13 @@ public class ElasticSearchConfiguration {
     public RestClient restClient() {
         return RestClient
                 .builder(HttpHost.create(properties.getHost()))
-                .setDefaultHeaders(new org.apache.http.Header[]{
-                        new BasicHeader("Authorization", "ApiKey " + properties.getApiKey())
+                .setHttpClientConfigCallback(new RestClientBuilder.HttpClientConfigCallback() {
+                    @Override
+                    public HttpAsyncClientBuilder customizeHttpClient(HttpAsyncClientBuilder httpClientBuilder) {
+                        return httpClientBuilder.setDefaultHeaders(List.of(
+                                new BasicHeader("Authorization", "ApiKey " + properties.getApiKey())
+                        ));
+                    }
                 })
                 .build();
     }
