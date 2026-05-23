@@ -50,6 +50,7 @@ public class FileProcessComponent {
     private final IKnowledgeFileSegmentService knowledgeFileSegmentService;
     private final IKnowledgeFileService knowledgeFileService;
     private final FileStorage fileStorage;
+    private final EmbedProcess embedProcess;
 
     @Async
     @DistributeLock(scene = FILE_PROCESS_LOCK, keyExpression = "#fileDO.id", waitTime = 0)
@@ -104,8 +105,8 @@ public class FileProcessComponent {
         processedFileDO.setStatus(KnowledgeFileStatus.CHUNKED);
         boolean updateFileResult = knowledgeFileService.updateById(processedFileDO);
         Assert.isTrue(updateFileResult, "更新文件状态失败");
-        // todo 4、进行向量化
-
+        // 4、进行向量化
+        embedProcess.embedAndStore(processedFileDO);
     }
 
 }
