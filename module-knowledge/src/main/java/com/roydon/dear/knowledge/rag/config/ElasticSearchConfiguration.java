@@ -11,6 +11,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 
 import com.roydon.dear.model.registry.ModelRegistry;
 
@@ -32,6 +33,7 @@ public class ElasticSearchConfiguration {
                 .build();
     }
 
+    @Primary
     @Bean
     @ConditionalOnMissingBean
     public ElasticsearchVectorStore elasticsearchVectorStore(RestClient restClient) {
@@ -40,7 +42,7 @@ public class ElasticSearchConfiguration {
         ElasticsearchVectorStoreOptions options = new ElasticsearchVectorStoreOptions();
         options.setIndexName(properties.getIndexName());
         options.setDimensions(properties.getDimensions());
-        options.setSimilarity(SimilarityFunction.valueOf(properties.getSimilarity().toUpperCase()));
+        options.setSimilarity(SimilarityFunction.valueOf(properties.getSimilarity().toLowerCase()));
 
         return ElasticsearchVectorStore.builder(restClient, embeddingModel)
                 .options(options)
