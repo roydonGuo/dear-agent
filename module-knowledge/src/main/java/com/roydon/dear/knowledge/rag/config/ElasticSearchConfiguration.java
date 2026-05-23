@@ -1,5 +1,6 @@
 package com.roydon.dear.knowledge.rag.config;
 
+import com.roydon.dear.session.enums.ModelCategoryEnum;
 import org.apache.http.HttpHost;
 import org.elasticsearch.client.RestClient;
 import org.springframework.ai.embedding.EmbeddingModel;
@@ -37,7 +38,7 @@ public class ElasticSearchConfiguration {
     @Bean
     @ConditionalOnMissingBean
     public ElasticsearchVectorStore elasticsearchVectorStore(RestClient restClient) {
-        EmbeddingModel embeddingModel = modelRegistry.getDefaultEmbeddingModel("embedding");
+        EmbeddingModel embeddingModel = modelRegistry.getDefaultEmbeddingModel(ModelCategoryEnum.EMBEDDING.getCode());
 
         ElasticsearchVectorStoreOptions options = new ElasticsearchVectorStoreOptions();
         options.setIndexName(properties.getIndexName());

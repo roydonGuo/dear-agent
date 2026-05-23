@@ -17,9 +17,16 @@ import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.stereotype.Service;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 向量化处理 —— 将分段后的文本批量向量化并存入 Elasticsearch。
+ *
+ * @author roydon
+ * @since 2026-05-23
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -43,7 +50,6 @@ public class EmbedProcess {
         LambdaQueryWrapper<KnowledgeFileSegmentDO> queryWrapper = Wrappers.<KnowledgeFileSegmentDO>lambdaQuery()
                 .eq(KnowledgeFileSegmentDO::getFileId, fileDO.getId())
                 .eq(KnowledgeFileSegmentDO::getStatus, FileSegmentStatus.CHUNKED)
-                .isNull(KnowledgeFileSegmentDO::getEmbeddingId)
                 .eq(KnowledgeFileSegmentDO::getSkipEmbedding, 0);
 
         int pageNum = 1;
@@ -58,7 +64,7 @@ public class EmbedProcess {
                         Map<String, Object> metadata = segment.getMetadata() != null
                                 ? JSON.parseObject(segment.getMetadata(),
                                         new TypeReference<Map<String, Object>>() {})
-                                : Map.of();
+                                : new HashMap<>();
                         return new Document(segment.getText(), metadata);
                     })
                     .toList();
@@ -87,7 +93,6 @@ public class EmbedProcess {
         long remainingCount = knowledgeSegmentService.count(Wrappers.<KnowledgeFileSegmentDO>lambdaQuery()
                 .eq(KnowledgeFileSegmentDO::getFileId, fileDO.getId())
                 .eq(KnowledgeFileSegmentDO::getStatus, FileSegmentStatus.CHUNKED)
-                .isNull(KnowledgeFileSegmentDO::getEmbeddingId)
                 .eq(KnowledgeFileSegmentDO::getSkipEmbedding, 0));
 
         if (remainingCount == 0) {

@@ -2,6 +2,7 @@ package com.roydon.dear.model.tts;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.roydon.dear.model.registry.ModelRegistry;
+import com.roydon.dear.session.enums.ModelCategoryEnum;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -34,7 +35,7 @@ public class RealtimeVoiceAgentService {
 
         ChatModel chatModel;
         try {
-            chatModel = modelRegistry.getDefaultChatModel("chat");
+            chatModel = modelRegistry.getDefaultChatModel(ModelCategoryEnum.CHAT.getCode());
         } catch (IllegalStateException e) {
             log.warn("模型配置异常: {}", e.getMessage());
             return Flux.just(ServerSentEvent.<String>builder()

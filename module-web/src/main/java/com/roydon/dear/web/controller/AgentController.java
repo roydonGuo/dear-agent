@@ -13,6 +13,7 @@ import com.roydon.dear.prompt.entity.AiPrompt;
 import com.roydon.dear.prompt.service.AiPromptService;
 import com.roydon.dear.session.entity.AiChatFile;
 import com.roydon.dear.session.entity.ChatConversation;
+import com.roydon.dear.session.enums.ModelCategoryEnum;
 import com.roydon.dear.session.service.ChatConversationService;
 import com.roydon.dear.session.service.ChatMessageService;
 import com.roydon.dear.session.service.IAiChatFileService;
@@ -178,7 +179,7 @@ public class AgentController {
         systemPrompt = systemPrompt + ReactAgentPrompts.getJoinSysPrompt();
         tools = mcpToolManager.getAllTools();
 
-        ChatModel chatModel = modelRegistry.getDefaultChatModel("chat");
+        ChatModel chatModel = modelRegistry.getDefaultChatModel(ModelCategoryEnum.CHAT.getCode());
 
         SkillRegistry skillRegistry = FileSystemSkillRegistry.builder()
                 .userSkillsDirectory(System.getProperty("user.home") + "/.dear-agent/.skills")
