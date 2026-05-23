@@ -36,7 +36,7 @@ public class EmbedProcess {
     private final IKnowledgeFileService knowledgeFileService;
     private final VectorStore vectorStore;
 
-    private static final int EMBEDDING_BATCH_SIZE = 100;
+    private static final int EMBEDDING_BATCH_SIZE = 10;
 
     public boolean embedAndStore(KnowledgeFileDO fileDO) {
         if (fileDO.getStatus() == KnowledgeFileStatus.VECTOR_STORED) {
@@ -53,21 +53,15 @@ public class EmbedProcess {
                 .eq(KnowledgeFileSegmentDO::getSkipEmbedding, 0);
 
         int pageNum = 1;
-        Page<KnowledgeFileSegmentDO> page = knowledgeSegmentService.page(
-                new Page<>(pageNum, EMBEDDING_BATCH_SIZE), queryWrapper);
+        Page<KnowledgeFileSegmentDO> page = knowledgeSegmentService.page(new Page<>(pageNum, EMBEDDING_BATCH_SIZE), queryWrapper);
 
         while (!page.getRecords().isEmpty()) {
             List<KnowledgeFileSegmentDO> segmentList = page.getRecords();
 
-            List<Document> documents = segmentList.stream()
-                    .map(segment -> {
-                        Map<String, Object> metadata = segment.getMetadata() != null
-                                ? JSON.parseObject(segment.getMetadata(),
-                                        new TypeReference<Map<String, Object>>() {})
-                                : new HashMap<>();
-                        return new Document(segment.getText(), metadata);
-                    })
-                    .toList();
+            List<Document> documents = segmentList.stream().map(segment -> {
+                Map<String, Object> metadata = segment.getMetadata() != null ? JSON.parseObject(segment.getMetadata(), new TypeReference<Map<String, Object>>() {}) : new HashMap<>();
+                return new Document(segment.getText(), metadata);
+            }).toList();
 
             try {
                 vectorStore.add(documents);
@@ -86,8 +80,7 @@ public class EmbedProcess {
                 break;
             }
             pageNum++;
-            page = knowledgeSegmentService.page(
-                    new Page<>(pageNum, EMBEDDING_BATCH_SIZE), queryWrapper);
+            page = knowledgeSegmentService.page(new Page<>(pageNum, EMBEDDING_BATCH_SIZE), queryWrapper);
         }
 
         long remainingCount = knowledgeSegmentService.count(Wrappers.<KnowledgeFileSegmentDO>lambdaQuery()
