@@ -63,7 +63,9 @@
       "Bash(rm -f \"D:/JetBrains/JavaProjects/dear-agent/.git/index.lock\")",
       "Bash(javap -cp D:/repo/repository/org/springframework/ai/spring-ai-elasticsearch-store/1.1.3/spring-ai-elasticsearch-store-1.1.3.jar org.springframework.ai.vectorstore.elasticsearch.SimilarityFunction)",
       "Read(//c/Users/31330/**)",
-      "Read(//usr/local/bin/**)"
+      "Read(//usr/local/bin/**)",
+      "Bash(cmd //c \"mvn compile -pl module-knowledge -am -q 2>&1\")",
+      "Bash(find /c/Users/31330/.m2 -name \"elasticsearch-rest-client-*.jar\" 2>/dev/null | head -5; find /d/ -path \"*/.m2/*\" -name \"elasticsearch-rest-client-*.jar\" 2>/dev/null | head -5)"
     ]
   },
   "enabledPlugins": {
