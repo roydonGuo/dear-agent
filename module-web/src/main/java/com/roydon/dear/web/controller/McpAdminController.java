@@ -2,6 +2,7 @@ package com.roydon.dear.web.controller;
 
 import com.roydon.dear.common.BaseResult;
 import com.roydon.dear.common.domain.mcp.McpServerVO;
+import io.micrometer.core.annotation.Timed;
 import com.roydon.dear.session.entity.McpServerConfig;
 import com.roydon.dear.session.service.McpServerConfigService;
 import com.roydon.dear.tool.McpToolManager;
@@ -31,12 +32,14 @@ public class McpAdminController {
     private final McpTransportFactory transportFactory;
     private final McpToolManager toolManager;
 
+    @Timed(value = "mcp.config.list", description = "List MCP configs")
     @GetMapping("/config")
     @Operation(summary = "MCP 配置列表")
     public BaseResult<List<McpServerConfig>> list() {
         return BaseResult.newSuccess(configService.listAllOrdered());
     }
 
+    @Timed(value = "mcp.config.create", description = "Create MCP config")
     @PostMapping("/config")
     @Transactional(rollbackFor = Exception.class)
     @Operation(summary = "新增 MCP 配置")
@@ -54,12 +57,14 @@ public class McpAdminController {
         return BaseResult.newSuccess(cfg);
     }
 
+    @Timed(value = "mcp.config.detail", description = "Get MCP config detail")
     @GetMapping("/config/{id}")
     @Operation(summary = "查询 MCP 配置")
     public BaseResult<McpServerConfig> detail(@PathVariable Long id) {
         return BaseResult.newSuccess(configService.getById(id));
     }
 
+    @Timed(value = "mcp.config.update", description = "Update MCP config")
     @PutMapping("/config/{id}")
     @Transactional(rollbackFor = Exception.class)
     @Operation(summary = "编辑 MCP 配置")
@@ -70,6 +75,7 @@ public class McpAdminController {
         return BaseResult.newSuccess(cfg);
     }
 
+    @Timed(value = "mcp.config.delete", description = "Delete MCP config")
     @DeleteMapping("/config/{id}")
     @Transactional(rollbackFor = Exception.class)
     @Operation(summary = "删除 MCP 配置")
@@ -83,6 +89,7 @@ public class McpAdminController {
         return BaseResult.newSuccess();
     }
 
+    @Timed(value = "mcp.test", description = "Test MCP connection")
     @PostMapping("/test")
     @Operation(summary = "测试 MCP 连接")
     public BaseResult<String> testConnection(@RequestBody McpServerConfig cfg) {
@@ -94,6 +101,7 @@ public class McpAdminController {
         }
     }
 
+    @Timed(value = "mcp.refresh", description = "Refresh all MCP connections")
     @PostMapping("/refresh")
     @Operation(summary = "刷新全部 MCP 连接")
     public BaseResult<Void> refreshAll() {
@@ -101,6 +109,7 @@ public class McpAdminController {
         return BaseResult.newSuccess();
     }
 
+    @Timed(value = "mcp.tools", description = "List MCP tools")
     @GetMapping("/tools")
     @Operation(summary = "获取当前 MCP 工具列表（按 MCP 服务端分组）")
     public BaseResult<List<McpServerVO>> listTools() {

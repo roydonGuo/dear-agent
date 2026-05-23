@@ -223,6 +223,7 @@ public class KnowledgeFileServiceImpl extends ServiceImpl<KnowledgeFileMapper, K
                     .fileUrl(resolveFileUrl(file.getStoragePath()))
                     .createTime(file.getCreateTime())
                     .updateTime(file.getUpdateTime())
+                    .status(file.getStatus())
                     .children(new ArrayList<>())
                     .build();
 

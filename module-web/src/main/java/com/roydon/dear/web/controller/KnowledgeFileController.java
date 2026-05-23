@@ -2,6 +2,7 @@ package com.roydon.dear.web.controller;
 
 import com.roydon.dear.common.BaseResult;
 import com.roydon.dear.common.exception.BusinessException;
+import io.micrometer.core.annotation.Timed;
 import com.roydon.dear.knowledge.domain.entity.KnowledgeFileDO;
 import com.roydon.dear.knowledge.domain.entity.convertor.KnowledgeFileConvertor;
 import com.roydon.dear.knowledge.domain.req.KnowledgeFileRequest;
@@ -42,6 +43,7 @@ public class KnowledgeFileController {
     private final KnowledgeFileConvertor knowledgeFileConvertor;
     private final FileProcessComponent fileProcessComponent;
 
+    @Timed(value = "knowledge-file.tree", description = "Get file tree")
     @GetMapping("/tree")
     @Operation(summary = "查询文件树", description = "根据知识库ID查询完整的文件树结构")
     public BaseResult<List<KnowledgeFileTreeNode>> tree(@RequestParam Long baseId) {
@@ -50,6 +52,7 @@ public class KnowledgeFileController {
         return BaseResult.newSuccess(tree);
     }
 
+    @Timed(value = "knowledge-file.detail", description = "Get file detail")
     @GetMapping("/{id}")
     @Operation(summary = "查询文件详情", description = "根据ID查询文件详情（含内容和访问URL）")
     public BaseResult<KnowledgeFileResp> getById(@PathVariable Long id) {
@@ -61,6 +64,7 @@ public class KnowledgeFileController {
         return BaseResult.newSuccess(resp);
     }
 
+    @Timed(value = "knowledge-file.create", description = "Create file/folder")
     @PostMapping
     @Operation(summary = "创建文件/文件夹", description = "创建新的文件或文件夹节点（文本类型）")
     public BaseResult<KnowledgeFileResp> create(@Valid @RequestBody KnowledgeFileRequest request) {
@@ -72,6 +76,7 @@ public class KnowledgeFileController {
         return BaseResult.newSuccess(knowledgeFileConvertor.toResp(entity));
     }
 
+    @Timed(value = "knowledge-file.upload", description = "Upload file to knowledge base")
     @PostMapping("/upload")
     @Operation(summary = "上传文件", description = "上传文件到知识库，支持 PDF/图片/Word/文本等格式，自动存储到 MinIO")
     public BaseResult<KnowledgeFileResp> upload(
@@ -85,6 +90,7 @@ public class KnowledgeFileController {
         return BaseResult.newSuccess(resp);
     }
 
+    @Timed(value = "knowledge-file.file-url", description = "Get file access URL")
     @GetMapping("/{id}/url")
     @Operation(summary = "获取文件访问URL", description = "获取文件的 MinIO 预签名访问 URL")
     public BaseResult<String> getFileUrl(@PathVariable Long id) {
@@ -95,6 +101,7 @@ public class KnowledgeFileController {
         return BaseResult.newSuccess(url);
     }
 
+    @Timed(value = "knowledge-file.download", description = "Download file")
     @GetMapping("/{id}/download")
     @Operation(summary = "下载文件", description = "以附件形式下载文件，浏览器触发另存为")
     public ResponseEntity<BaseResult<String>> download(@PathVariable Long id) {
@@ -120,6 +127,7 @@ public class KnowledgeFileController {
                 .body(BaseResult.newSuccess(url));
     }
 
+    @Timed(value = "knowledge-file.update", description = "Update file/folder")
     @PutMapping("/{id}")
     @Operation(summary = "更新文件/文件夹", description = "更新文件或文件夹的名称、内容等信息")
     public BaseResult<KnowledgeFileResp> update(@PathVariable Long id, @Valid @RequestBody KnowledgeFileRequest request) {
@@ -133,6 +141,7 @@ public class KnowledgeFileController {
         return BaseResult.newSuccess(resp);
     }
 
+    @Timed(value = "knowledge-file.delete", description = "Delete file/folder")
     @DeleteMapping("/{id}")
     @Transactional(rollbackFor = Exception.class)
     @Operation(summary = "删除文件/文件夹", description = "删除指定节点，若为文件夹则级联删除所有子节点并清理 MinIO 文件")
@@ -148,6 +157,7 @@ public class KnowledgeFileController {
         return BaseResult.newSuccess("删除成功");
     }
 
+    @Timed(value = "knowledge-file.process", description = "Process and embed file")
     @PostMapping("/embed/{fileId}")
     public BaseResult<String> processFile(@PathVariable Long fileId) {
         KnowledgeFileDO entity = knowledgeFileService.getById(fileId);

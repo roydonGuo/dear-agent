@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.roydon.dear.common.BaseResult;
 import com.roydon.dear.core.service.FileStorage;
+import io.micrometer.core.annotation.Timed;
 import com.roydon.dear.core.service.FileUploadResult;
 import com.roydon.dear.knowledge.domain.entity.KnowledgeBaseDO;
 import com.roydon.dear.knowledge.domain.entity.KnowledgeCategoryDO;
@@ -41,12 +42,14 @@ public class KnowledgeController {
 
     // ==================== 知识库分类 ====================
 
+    @Timed(value = "knowledge.category.list", description = "List knowledge categories")
     @GetMapping("/category/list")
     @Operation(summary = "知识库分类列表（集合，无分页）")
     public BaseResult<List<KnowledgeCategoryResp>> listCategories() {
         return BaseResult.newSuccess(knowledgeCategoryService.listAll());
     }
 
+    @Timed(value = "knowledge.category.create", description = "Create knowledge category")
     @PostMapping("/category")
     @Transactional(rollbackFor = Exception.class)
     @Operation(summary = "新增知识库分类")
@@ -65,12 +68,14 @@ public class KnowledgeController {
         return BaseResult.newSuccess(resp);
     }
 
+    @Timed(value = "knowledge.category.detail", description = "Get knowledge category detail")
     @GetMapping("/category/{id}")
     @Operation(summary = "查询知识库分类详情")
     public BaseResult<KnowledgeCategoryResp> getCategory(@PathVariable Long id) {
         return BaseResult.newSuccess(knowledgeCategoryService.findById(id));
     }
 
+    @Timed(value = "knowledge.category.update", description = "Update knowledge category")
     @PutMapping("/category/{id}")
     @Transactional(rollbackFor = Exception.class)
     @Operation(summary = "编辑知识库分类")
@@ -94,6 +99,7 @@ public class KnowledgeController {
         return BaseResult.newSuccess(resp);
     }
 
+    @Timed(value = "knowledge.category.delete", description = "Delete knowledge category")
     @DeleteMapping("/category/{id}")
     @Transactional(rollbackFor = Exception.class)
     @Operation(summary = "删除知识库分类")
@@ -110,6 +116,7 @@ public class KnowledgeController {
 
     // ==================== 知识库 ====================
 
+    @Timed(value = "knowledge.list", description = "List knowledge bases")
     @GetMapping("/list")
     @Operation(summary = "知识库分页列表")
     public BaseResult<PageResult<KnowledgeBaseResp>> listKnowledgeBases(
@@ -134,6 +141,7 @@ public class KnowledgeController {
         return BaseResult.newSuccess(pageResult);
     }
 
+    @Timed(value = "knowledge.create", description = "Create knowledge base")
     @PostMapping
     @Transactional(rollbackFor = Exception.class)
     @Operation(summary = "新增知识库")
@@ -149,6 +157,7 @@ public class KnowledgeController {
         return BaseResult.newSuccess(buildBaseResp(knowledgeBase));
     }
 
+    @Timed(value = "knowledge.detail", description = "Get knowledge base detail")
     @GetMapping("/{id}")
     @Operation(summary = "查询知识库详情")
     public BaseResult<KnowledgeBaseResp> getKnowledgeBase(@PathVariable Long id) {
@@ -159,6 +168,7 @@ public class KnowledgeController {
         return BaseResult.newSuccess(resp);
     }
 
+    @Timed(value = "knowledge.update", description = "Update knowledge base")
     @PutMapping("/{id}")
     @Transactional(rollbackFor = Exception.class)
     @Operation(summary = "编辑知识库")
@@ -179,6 +189,7 @@ public class KnowledgeController {
         return BaseResult.newSuccess(buildBaseResp(knowledgeBase));
     }
 
+    @Timed(value = "knowledge.delete", description = "Delete knowledge base")
     @DeleteMapping("/{id}")
     @Transactional(rollbackFor = Exception.class)
     @Operation(summary = "删除知识库")

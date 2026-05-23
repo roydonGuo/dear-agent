@@ -1,6 +1,7 @@
 package com.roydon.dear.web.controller;
 
 import com.roydon.dear.common.BaseResult;
+import io.micrometer.core.annotation.Timed;
 import com.roydon.dear.skill.model.Skill;
 import com.roydon.dear.skill.service.SkillService;
 import com.roydon.dear.skill.tool.SkillsTool;
@@ -28,12 +29,14 @@ public class SkillAdminController {
     private final SkillService skillService;
     private final SkillsTool skillsTool;
 
+    @Timed(value = "skill.list", description = "List skills")
     @GetMapping
     @Operation(summary = "获取 Skill 列表")
     public BaseResult<List<Skill>> list() {
         return BaseResult.newSuccess(skillService.listAll());
     }
 
+    @Timed(value = "skill.detail", description = "Get skill detail")
     @GetMapping("/{name}")
     @Operation(summary = "获取单个 Skill（含完整 Markdown body）")
     public BaseResult<Skill> detail(@PathVariable String name) {
@@ -44,6 +47,7 @@ public class SkillAdminController {
         return BaseResult.newSuccess(skill);
     }
 
+    @Timed(value = "skill.create", description = "Create skill")
     @PostMapping
     @Operation(summary = "新增 Skill（自动生成 SKILL.md）")
     public BaseResult<Skill> create(@RequestBody Skill skill) {
@@ -57,6 +61,7 @@ public class SkillAdminController {
         }
     }
 
+    @Timed(value = "skill.update", description = "Update skill")
     @PutMapping("/{name}")
     @Operation(summary = "更新 Skill（重写 SKILL.md）")
     public BaseResult<Skill> update(@PathVariable String name, @RequestBody Skill skill) {
@@ -70,6 +75,7 @@ public class SkillAdminController {
         }
     }
 
+    @Timed(value = "skill.delete", description = "Delete skill")
     @DeleteMapping("/{name}")
     @Operation(summary = "删除 Skill（删除整个目录）")
     public BaseResult<Void> delete(@PathVariable String name) {
@@ -81,6 +87,7 @@ public class SkillAdminController {
         return result ? BaseResult.newSuccess() : BaseResult.newError("删除失败");
     }
 
+    @Timed(value = "skill.toggle", description = "Toggle skill enabled")
     @PatchMapping("/{name}/toggle")
     @Operation(summary = "启用 / 禁用 Skill")
     public BaseResult<Skill> toggle(@PathVariable String name) {
@@ -94,6 +101,7 @@ public class SkillAdminController {
         }
     }
 
+    @Timed(value = "skill.refresh", description = "Refresh skill registry")
     @PostMapping("/refresh")
     @Operation(summary = "刷新 SkillsTool 注册表")
     public BaseResult<Map<String, Object>> refresh() {
@@ -104,6 +112,7 @@ public class SkillAdminController {
         ));
     }
 
+    @Timed(value = "skill.tools", description = "List skill tools")
     @GetMapping("/tools")
     @Operation(summary = "获取已加载的工具列表（含主 skill 工具 + 可执行技能工具）")
     public BaseResult<List<Map<String, Object>>> listTools() {

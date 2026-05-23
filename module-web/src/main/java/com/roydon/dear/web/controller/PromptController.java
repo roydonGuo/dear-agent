@@ -3,6 +3,7 @@ package com.roydon.dear.web.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.roydon.dear.common.BaseResult;
+import io.micrometer.core.annotation.Timed;
 import com.roydon.dear.core.service.FileStorage;
 import com.roydon.dear.core.service.FileUploadResult;
 import com.roydon.dear.prompt.entity.AiPrompt;
@@ -37,12 +38,14 @@ public class PromptController {
 
     // ====== 人设分类 ======
 
+    @Timed(value = "prompt.category.list", description = "List prompt categories")
     @GetMapping("/category/list")
     @Operation(summary = "人设分类列表（集合，无分页）")
     public BaseResult<List<AiPromptCategory>> listCategories() {
         return BaseResult.newSuccess(categoryService.listAllOrdered());
     }
 
+    @Timed(value = "prompt.category.create", description = "Create prompt category")
     @PostMapping("/category")
     @Transactional(rollbackFor = Exception.class)
     @Operation(summary = "新增人设分类")
@@ -55,12 +58,14 @@ public class PromptController {
         return BaseResult.newSuccess(category);
     }
 
+    @Timed(value = "prompt.category.detail", description = "Get prompt category detail")
     @GetMapping("/category/{id}")
     @Operation(summary = "查询人设分类详情")
     public BaseResult<AiPromptCategory> getCategory(@PathVariable Long id) {
         return BaseResult.newSuccess(categoryService.getById(id));
     }
 
+    @Timed(value = "prompt.category.update", description = "Update prompt category")
     @PutMapping("/category/{id}")
     @Transactional(rollbackFor = Exception.class)
     @Operation(summary = "编辑人设分类")
@@ -76,6 +81,7 @@ public class PromptController {
         return BaseResult.newSuccess(category);
     }
 
+    @Timed(value = "prompt.category.delete", description = "Delete prompt category")
     @DeleteMapping("/category/{id}")
     @Transactional(rollbackFor = Exception.class)
     @Operation(summary = "删除人设分类")
@@ -90,6 +96,7 @@ public class PromptController {
 
     // ====== 人设 ======
 
+    @Timed(value = "prompt.list", description = "List prompts")
     @GetMapping("/list")
     @Operation(summary = "人设分页列表")
     public BaseResult<PageResult<AiPrompt>> listPrompts(
@@ -116,6 +123,7 @@ public class PromptController {
         return BaseResult.newSuccess(pageResult);
     }
 
+    @Timed(value = "prompt.create", description = "Create prompt")
     @PostMapping
     @Transactional(rollbackFor = Exception.class)
     @Operation(summary = "新增人设")
@@ -131,6 +139,7 @@ public class PromptController {
         return BaseResult.newSuccess(prompt);
     }
 
+    @Timed(value = "prompt.detail", description = "Get prompt detail")
     @GetMapping("/{id}")
     @Operation(summary = "查询人设详情")
     public BaseResult<AiPrompt> getPrompt(@PathVariable Long id) {
@@ -141,6 +150,7 @@ public class PromptController {
         return BaseResult.newSuccess(prompt);
     }
 
+    @Timed(value = "prompt.update", description = "Update prompt")
     @PutMapping("/{id}")
     @Transactional(rollbackFor = Exception.class)
     @Operation(summary = "编辑人设")
@@ -182,6 +192,7 @@ public class PromptController {
         }
     }
 
+    @Timed(value = "prompt.delete", description = "Delete prompt")
     @DeleteMapping("/{id}")
     @Transactional(rollbackFor = Exception.class)
     @Operation(summary = "删除人设")

@@ -2,6 +2,7 @@ package com.roydon.dear.web.controller;
 
 import com.roydon.dear.knowledge.domain.entity.convertor.KnowledgeFileConvertor;
 import com.roydon.dear.knowledge.service.IKnowledgeFileService;
+import io.micrometer.core.annotation.Timed;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +23,7 @@ public class KnowledgeFileSegmentController {
     private final KnowledgeFileConvertor knowledgeFileConvertor;
 
 
+    @Timed(value = "kf-segment.process", description = "Process file segments")
     @PostMapping("/process-file")
     public String processFile(Long fileId) {
 

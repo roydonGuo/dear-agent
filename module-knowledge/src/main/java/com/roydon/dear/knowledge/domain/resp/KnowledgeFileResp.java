@@ -1,5 +1,6 @@
 package com.roydon.dear.knowledge.domain.resp;
 
+import com.roydon.dear.knowledge.enums.KnowledgeFileStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -39,4 +40,6 @@ public class KnowledgeFileResp implements Serializable {
     private LocalDateTime createTime;
 
     private LocalDateTime updateTime;
+
+    private KnowledgeFileStatus status;
 }

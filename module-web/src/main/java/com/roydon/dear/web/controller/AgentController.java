@@ -9,6 +9,7 @@ import com.roydon.dear.common.manager.AgentTaskManager;
 import com.roydon.dear.common.prompts.ReactAgentPrompts;
 import com.roydon.dear.model.registry.ModelRegistry;
 import com.roydon.dear.model.tts.AgentVoiceStreamService;
+import com.roydon.dear.web.common.BusinessMetrics;
 import com.roydon.dear.prompt.entity.AiPrompt;
 import com.roydon.dear.prompt.service.AiPromptService;
 import com.roydon.dear.session.entity.AiChatFile;
@@ -18,6 +19,7 @@ import com.roydon.dear.session.service.ChatConversationService;
 import com.roydon.dear.session.service.ChatMessageService;
 import com.roydon.dear.session.service.IAiChatFileService;
 import com.roydon.dear.tool.McpToolManager;
+import io.micrometer.core.annotation.Timed;
 import io.swagger.v3.oas.annotations.Operation;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -61,6 +63,9 @@ public class AgentController {
     @Autowired
     private IAiChatFileService aiChatFileService;
 
+    @Autowired
+    private BusinessMetrics businessMetrics;
+
     /**
      * 智能问答流式接口
      * <p>
@@ -77,6 +82,7 @@ public class AgentController {
      * @param fileIds        关联的文件ID列表，可选参数
      * @return Flux<String>  返回响应式流式数据，包含AI回复内容或错误信息
      */
+    @Timed(value = "agent.chat.stream", description = "Agent chat stream endpoint")
     @GetMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @Operation(summary = "智能问答", description = "接收用户查询并返回流式响应，使用联网搜索获取信息")
     public Flux<String> webSearchStream(@RequestParam String query,
@@ -91,6 +97,8 @@ public class AgentController {
         boolean voiceEnabled = Boolean.TRUE.equals(voiceOutput);
         log.info("收到请求: query={}, conversationId={}, think={}, webSearch={}, voiceOutput={}, voice={}",
                 query, conversationId, thinkEnabled, webSearchEnabled, voiceEnabled, voice);
+
+        businessMetrics.recordChatRequest();
 
         // 验证查询参数有效性
         if (query == null || query.trim().isEmpty()) {
@@ -111,22 +119,26 @@ public class AgentController {
         } catch (IllegalStateException e) {
             // 处理模型配置异常
             log.warn("模型配置异常: {}", e.getMessage());
+            businessMetrics.recordChatError();
             return Flux.just(
                     AgentResponse.error("模型未配置：" + e.getMessage()),
                     AgentResponse.done("error"));
         } catch (Exception e) {
             // 处理其他未预期异常
             log.error("处理请求时发生错误: ", e);
+            businessMetrics.recordChatError();
             return Flux.just(
                     AgentResponse.error("服务异常：" + e.getMessage()),
                     AgentResponse.done("error"));
         }
     }
 
+    @Timed(value = "agent.stop", description = "Agent stop endpoint")
     @GetMapping("/stop")
     @Operation(summary = "停止Agent执行", description = "停止指定会话的Agent执行，中断底层调用")
     public Map<String, Object> stopAgent(@RequestParam String conversationId) {
         log.info("收到停止请求: conversationId={}", conversationId);
+        businessMetrics.recordStopRequest();
         boolean success = taskManager.stopTask(conversationId);
         Map<String, Object> result = new HashMap<>();
         result.put("code", 200);

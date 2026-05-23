@@ -2,6 +2,7 @@ package com.roydon.dear.web.controller;
 
 import com.roydon.dear.common.BaseResult;
 import com.roydon.dear.core.service.FileStorage;
+import io.micrometer.core.annotation.Timed;
 import com.roydon.dear.model.registry.ModelRegistry;
 import com.roydon.dear.session.entity.AiChatFile;
 import com.roydon.dear.session.enums.ModelCategoryEnum;
@@ -52,6 +53,7 @@ public class AiChatFileController {
      * @param file 文件
      * @return 文件url
      */
+    @Timed(value = "chat-file.upload", description = "Upload chat file")
     @PostMapping("/upload")
     @Transactional(rollbackFor = Exception.class)
     public BaseResult<AiChatFile> upload(@RequestParam("file") MultipartFile file) {

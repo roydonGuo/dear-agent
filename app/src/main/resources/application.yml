@@ -111,6 +111,18 @@ elasticsearch:
   dimensions: 1536
   initialize-schema: false
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, prometheus
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: dear-agent
+
 logging:
   level:
     com.roydon.dear: debug

@@ -1,6 +1,7 @@
 package com.roydon.dear.web.controller;
 
 import com.roydon.dear.common.BaseResult;
+import io.micrometer.core.annotation.Timed;
 import com.roydon.dear.model.provider.ModelProvider;
 import com.roydon.dear.model.registry.ModelRegistry;
 import com.roydon.dear.session.entity.ModelConfig;
@@ -33,6 +34,7 @@ public class ModelAdminController {
     private final ModelRegistry registry;
     private final List<ModelProvider> providers;
 
+    @Timed(value = "model.config.list", description = "List model configs")
     @GetMapping("/config")
     @Operation(summary = "模型配置列表")
     public BaseResult<List<ModelConfig>> list(@RequestParam(required = false) String category,
@@ -41,6 +43,7 @@ public class ModelAdminController {
         return BaseResult.newSuccess(list);
     }
 
+    @Timed(value = "model.config.create", description = "Create model config")
     @PostMapping("/config")
     @Transactional(rollbackFor = Exception.class)
     @Operation(summary = "新增模型配置")
@@ -54,12 +57,14 @@ public class ModelAdminController {
         return BaseResult.newSuccess(cfg);
     }
 
+    @Timed(value = "model.config.detail", description = "Get model config detail")
     @GetMapping("/config/{id}")
     @Operation(summary = "获取模型配置")
     public BaseResult<ModelConfig> detail(@PathVariable Long id) {
         return BaseResult.newSuccess(configService.getById(id));
     }
 
+    @Timed(value = "model.config.update", description = "Update model config")
     @PutMapping("/config/{id}")
     @Transactional(rollbackFor = Exception.class)
     @Operation(summary = "编辑模型配置（热刷新）")
@@ -72,6 +77,7 @@ public class ModelAdminController {
         return BaseResult.newSuccess(cfg);
     }
 
+    @Timed(value = "model.config.delete", description = "Delete model config")
     @DeleteMapping("/config/{id}")
     @Transactional(rollbackFor = Exception.class)
     @Operation(summary = "删除模型配置")
@@ -86,6 +92,7 @@ public class ModelAdminController {
         return BaseResult.newSuccess();
     }
 
+    @Timed(value = "model.test", description = "Test model connection")
     @PostMapping("/test")
     @Operation(summary = "测试模型连接")
     public BaseResult<String> testConnection(@RequestBody ModelConfig cfg) {
@@ -134,6 +141,7 @@ public class ModelAdminController {
         }
     }
 
+    @Timed(value = "model.providers", description = "List model providers")
     @GetMapping("/providers")
     @Operation(summary = "获取支持的供应商列表")
     public BaseResult<List<ProviderVO>> listProviders() {

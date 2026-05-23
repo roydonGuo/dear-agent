@@ -4,6 +4,7 @@ import cn.hutool.core.collection.CollUtil;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.roydon.dear.common.BaseResult;
+import io.micrometer.core.annotation.Timed;
 import com.roydon.dear.prompt.entity.AiPrompt;
 import com.roydon.dear.prompt.service.AiPromptService;
 import com.roydon.dear.session.entity.AiChatFile;
@@ -42,6 +43,7 @@ public class SessionController {
     private final AiPromptService promptService;
     private final IAiChatFileService aiChatFileService;
 
+    @Timed(value = "session.detail", description = "Get session detail")
     @GetMapping("/{conversationId}")
     @Operation(summary = "查询会话的对话列表", description = "根据conversationId查询会话中的对话列表详情")
     public BaseResult<SessionDetailVO> getSession(@PathVariable String conversationId) {
@@ -70,6 +72,7 @@ public class SessionController {
         }
     }
 
+    @Timed(value = "session.list", description = "List sessions")
     @GetMapping("/list")
     @Operation(summary = "查询会话列表", description = "分页查询会话列表")
     public BaseResult<PageResult<SessionListVO>> getSessionList(
@@ -107,6 +110,7 @@ public class SessionController {
         }
     }
 
+    @Timed(value = "session.delete", description = "Delete session")
     @DeleteMapping("/{conversationId}")
     @Transactional(rollbackFor = Exception.class)
     @Operation(summary = "删除会话", description = "删除指定会话及其关联数据")
@@ -168,6 +172,7 @@ public class SessionController {
         return result;
     }
 
+    @Timed(value = "session.info", description = "Get session info")
     @GetMapping("/{conversationId}/info")
     @Operation(summary = "查询会话基本信息", description = "根据conversationId查询会话基本信息，包含人设信息、消息条数等")
     public BaseResult<SessionListVO> getSessionInfo(@PathVariable String conversationId) {
@@ -191,6 +196,7 @@ public class SessionController {
         }
     }
 
+    @Timed(value = "session.edit", description = "Edit session")
     @PutMapping("/{conversationId}")
     @Operation(summary = "编辑会话", description = "根据conversationId编辑会话，可修改title和promptId")
     public BaseResult<String> editSession(@PathVariable String conversationId,
