@@ -46,6 +46,9 @@ public class ModelConfig implements Serializable {
     @TableField("top_p")
     private Double topP;
 
+    @TableField("dimensions")
+    private Integer dimensions;
+
     @TableField("json_response")
     private Boolean jsonResponse;
 

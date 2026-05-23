@@ -52,7 +52,7 @@ public class FileProcessComponent {
     private final FileStorage fileStorage;
     private final EmbedProcess embedProcess;
 
-    @Async
+    @Async("fileProcessExecutor")
     @DistributeLock(scene = FILE_PROCESS_LOCK, keyExpression = "#fileDO.id", waitTime = 0)
     public void processFile(KnowledgeFileDO fileDO) {
         // 1、文件处理

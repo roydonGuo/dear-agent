@@ -15,7 +15,7 @@ public class ElasticSearchProperties {
     /**
      * Vector dimension for embeddings.
      */
-    private int dimensions = 1024;
+    private int dimensions = 1536;
 
     /**
      * Similarity function for vector search: cosine, dot_product, l2_norm.

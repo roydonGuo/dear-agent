@@ -30,15 +30,18 @@ public class KnowledgeTest {
      */
     @Test
     public void testSimilaritySearch() {
-        String query = "什么是微服务架构";
+        String query = "mcp表单一般有哪些内容";
         List<Document> results = vectorStore.similaritySearch(
-                SearchRequest.query(query).withTopK(5).withSimilarityThreshold(0.5));
+                SearchRequest.builder()
+                        .query(query)
+                        .topK(5)
+                        .similarityThreshold(0.5)
+                        .build());
 
         log.info("查询: {}, 命中 {} 条结果", query, results.size());
         for (int i = 0; i < results.size(); i++) {
             Document doc = results.get(i);
-            log.info("[{}] score={}, content={}, metadata={}",
-                    i + 1, doc.getScore(), truncate(doc.getText(), 200), doc.getMetadata());
+            log.info("[{}] score={}, content={}, metadata={}", i + 1, doc.getScore(), truncate(doc.getText(), 200), doc.getMetadata().toString());
         }
     }
 
@@ -47,18 +50,19 @@ public class KnowledgeTest {
      */
     @Test
     public void testSimilaritySearchWithFilter() {
-        String query = "Spring Boot 配置";
+        String query = "mcp表单一般有哪些内容";
         List<Document> results = vectorStore.similaritySearch(
-                SearchRequest.query(query)
-                        .withTopK(5)
-                        .withSimilarityThreshold(0.3)
-                        .withFilterExpression("file_id == 1"));
+                SearchRequest.builder()
+                        .query(query)
+                        .topK(5)
+                        .similarityThreshold(0.1)
+                        .filterExpression("fileId == '2056914581698805762'")
+                        .build());
 
         log.info("带过滤条件查询: {}, 命中 {} 条", query, results.size());
         for (int i = 0; i < results.size(); i++) {
             Document doc = results.get(i);
-            log.info("[{}] score={}, content={}, metadata={}",
-                    i + 1, doc.getScore(), truncate(doc.getText(), 200), doc.getMetadata());
+            log.info("[{}] score={}, content={}, metadata={}", i + 1, doc.getScore(), truncate(doc.getText(), 200), doc.getMetadata());
         }
     }
 
@@ -67,14 +71,13 @@ public class KnowledgeTest {
      */
     @Test
     public void testSimpleSearch() {
-        String query = "知识库";
+        String query = "mcp表单一般有哪些内容";
         List<Document> results = vectorStore.similaritySearch(query);
 
         log.info("简单查询: {}, 命中 {} 条 (默认TopK=4)", query, results.size());
         for (int i = 0; i < results.size(); i++) {
             Document doc = results.get(i);
-            log.info("[{}] score={}, content={}",
-                    i + 1, doc.getScore(), truncate(doc.getText(), 150));
+            log.info("[{}] score={}, content={}", i + 1, doc.getScore(), truncate(doc.getText(), 150));
         }
     }
 

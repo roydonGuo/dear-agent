@@ -65,6 +65,9 @@ public class DashscopeModelProvider implements ModelProvider {
                 .apiKey(config.getApiKey())
                 .build();
         return new OpenAiEmbeddingModel(openAiApi, MetadataMode.EMBED,
-                OpenAiEmbeddingOptions.builder().model(config.getModel()).build());
+                OpenAiEmbeddingOptions.builder()
+                        .model(config.getModel())
+                        .dimensions(1536) // todo 向量维度配置
+                        .build());
     }
 }
