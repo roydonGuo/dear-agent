@@ -2,6 +2,7 @@ package com.roydon.dear.knowledge.rag.config;
 
 import com.roydon.dear.session.enums.ModelCategoryEnum;
 import org.apache.http.HttpHost;
+import org.apache.http.message.BasicHeader;
 import org.elasticsearch.client.RestClient;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.vectorstore.elasticsearch.ElasticsearchVectorStore;
@@ -31,6 +32,9 @@ public class ElasticSearchConfiguration {
     public RestClient restClient() {
         return RestClient
                 .builder(HttpHost.create(properties.getHost()))
+                .setDefaultHeaders(new org.apache.http.Header[]{
+                        new BasicHeader("Authorization", "ApiKey " + properties.getApiKey())
+                })
                 .build();
     }
 
