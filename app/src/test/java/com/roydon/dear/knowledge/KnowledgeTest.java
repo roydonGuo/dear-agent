@@ -30,7 +30,7 @@ public class KnowledgeTest {
      */
     @Test
     public void testSimilaritySearch() {
-        String query = "mcp表单一般有哪些内容";
+        String query = "如何设计一个比较好的Prompt";
         List<Document> results = vectorStore.similaritySearch(
                 SearchRequest.builder()
                         .query(query)

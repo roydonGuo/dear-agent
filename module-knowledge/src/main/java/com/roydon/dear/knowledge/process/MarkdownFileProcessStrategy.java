@@ -1,5 +1,6 @@
 package com.roydon.dear.knowledge.process;
 
+import cn.hutool.core.util.StrUtil;
 import com.roydon.dear.common.util.FileUtil;
 import com.roydon.dear.core.service.FileStorage;
 import com.roydon.dear.knowledge.domain.entity.KnowledgeFileDO;
@@ -62,8 +63,13 @@ public class MarkdownFileProcessStrategy implements FileProcessStrategy {
         // 3.上传minio
         byte[] bytes = processedMdContent.getBytes(StandardCharsets.UTF_8);
         ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(bytes);
-
-        String storeKey = PROCESSED_MINIO_KEY_PREFIX + "/" + UUID.randomUUID().toString().replace("-", "") + "." + FileUtil.getFileExtension(fileDO.getStoragePath());
+        String storeKey = "";
+        if (StrUtil.isEmpty(fileDO.getStoragePath())) {
+            // 说明是手动创建的md文档
+            storeKey = PROCESSED_MINIO_KEY_PREFIX + "/" + UUID.randomUUID().toString().replace("-", "") + "." + FileUtil.getFileExtension(fileDO.getName());
+        } else {
+            storeKey = PROCESSED_MINIO_KEY_PREFIX + "/" + UUID.randomUUID().toString().replace("-", "") + "." + FileUtil.getFileExtension(fileDO.getStoragePath());
+        }
         fileStorage.upload(fileStorage.getDefaultBucket(), storeKey, byteArrayInputStream, bytes.length, fileDO.getMineType(), false);
         log.debug("上传 Markdown 文件成功: {}", fileDO.getName());
         // 4.更新文档状态
