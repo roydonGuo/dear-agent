@@ -14,7 +14,7 @@ import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
-import java.net.URISyntaxException;
+
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.UUID;
@@ -90,14 +90,7 @@ public class MarkdownFileProcessStrategy implements FileProcessStrategy {
             String imagePath = matcher.group(2);
 
             // 生成图片描述
-            String imageDescription = null;
-            try {
-                imageDescription = imageProcess.image2Text(imagePath);
-            } catch (URISyntaxException e) {
-                log.debug("图片描述生成失败: {}", e.getMessage());
-                matcher.appendReplacement(result, Matcher.quoteReplacement(matcher.group(0)));
-                continue;
-            }
+            String imageDescription = imageProcess.image2Text(imagePath);
 
             // 构建新的图片标签: ![描述](imagePath)
             String newImageTag = "![" + imageDescription + "](" + imagePath + ")";

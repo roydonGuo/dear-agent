@@ -4,6 +4,7 @@ import cn.hutool.core.collection.CollUtil;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.roydon.dear.common.BaseResult;
+import com.roydon.dear.core.service.FileStorage;
 import io.micrometer.core.annotation.Timed;
 import com.roydon.dear.prompt.entity.AiPrompt;
 import com.roydon.dear.prompt.service.AiPromptService;
@@ -23,6 +24,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
@@ -42,6 +44,7 @@ public class SessionController {
     private final ChatMessageService messageService;
     private final AiPromptService promptService;
     private final IAiChatFileService aiChatFileService;
+    private final FileStorage fileStorage;
 
     @Timed(value = "session.detail", description = "Get session detail")
     @GetMapping("/{conversationId}")
@@ -61,7 +64,7 @@ public class SessionController {
             if (conversation.getPromptId() != null) {
                 AiPrompt prompt = promptService.getById(conversation.getPromptId());
                 if (prompt != null) {
-                    detailVO.setAvatar(prompt.getAvatar());
+                    resolveAvatarUrl(prompt);
                     detailVO.setSystemPrompt(prompt.getPrompt());
                 }
             }
@@ -149,7 +152,7 @@ public class SessionController {
                 String fileIds = msg.getFileIds();
                 List<AiChatFile> chatFileList = List.of();
                 if (fileIds != null && !fileIds.isEmpty()) {
-                     chatFileList = aiChatFileService.getListByIds(fileIds);
+                    chatFileList = aiChatFileService.getListByIds(fileIds);
                 }
                 current = MessageVO.builder()
                         .id(msg.getId())
@@ -185,7 +188,7 @@ public class SessionController {
             if (conversation.getPromptId() != null) {
                 AiPrompt prompt = promptService.getById(conversation.getPromptId());
                 if (prompt != null) {
-                    vo.setAvatar(prompt.getAvatar());
+                    resolveAvatarUrl(prompt);
                     vo.setSystemPrompt(prompt.getPrompt());
                 }
             }
@@ -193,6 +196,15 @@ public class SessionController {
         } catch (Exception e) {
             log.error("查询会话基本信息失败: conversationId={}", conversationId, e);
             return BaseResult.newError("查询会话基本信息失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 根据 avatarKey 重新生成 presigned URL，覆盖 avatar 字段
+     */
+    private void resolveAvatarUrl(AiPrompt prompt) {
+        if (StringUtils.isNotBlank(prompt.getAvatarKey())) {
+            prompt.setAvatar(fileStorage.getFileUrl(prompt.getAvatarKey()));
         }
     }
 

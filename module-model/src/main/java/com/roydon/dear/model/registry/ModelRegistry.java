@@ -53,7 +53,7 @@ public class ModelRegistry {
         if (name == null) {
             throw new IllegalStateException("没有找到 " + category + " 类型的默认模型");
         }
-        // 创建对应类型的模型
+        // switch 创建对应类型的模型
 
         return getChatModel(name);
     }

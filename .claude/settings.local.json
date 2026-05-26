@@ -69,7 +69,10 @@
       "Bash(javap -classpath \"module-knowledge/target/deps/spring-ai-vector-store-1.1.3.jar\" org.springframework.ai.vectorstore.VectorStore)",
       "Bash(javap -classpath \"module-knowledge/target/deps/spring-ai-vector-store-1.1.3.jar\" org.springframework.ai.vectorstore.VectorStoreRetriever)",
       "Bash(javap -classpath \"module-knowledge/target/deps/spring-ai-vector-store-1.1.3.jar\" org.springframework.ai.vectorstore.SearchRequest)",
-      "Bash(javap -classpath module-knowledge/target/deps/spring-ai-vector-store-1.1.3.jar 'org.springframework.ai.vectorstore.SearchRequest$Builder')"
+      "Bash(javap -classpath module-knowledge/target/deps/spring-ai-vector-store-1.1.3.jar 'org.springframework.ai.vectorstore.SearchRequest$Builder')",
+      "Bash(./mvnw --version)",
+      "Bash(git checkout *)",
+      "Bash(where mvn.cmd)"
     ]
   },
   "enabledPlugins": {

@@ -99,6 +99,11 @@ public class KnowledgeFileServiceImpl extends ServiceImpl<KnowledgeFileMapper, K
         if (isTextBasedFile(mineType, extension)) {
             content = new String(fileBytes, java.nio.charset.StandardCharsets.UTF_8);
             log.info("Text content extracted for file: name={}, contentLength={}", originalFilename, content.length());
+            if(!content.isEmpty()){
+                // 处理并规范化内容
+                // 1、去除<font/></font>标签，只保留其中内容
+                content = content.replaceAll("<font.*?>(.*?)</font>", "$1");
+            }
         }
 
         KnowledgeFileDO entity = new KnowledgeFileDO();
@@ -149,6 +154,15 @@ public class KnowledgeFileServiceImpl extends ServiceImpl<KnowledgeFileMapper, K
             return null;
         }
         return fileStorage.getFileUrl(entity.getStoragePath());
+    }
+
+
+    public static void main(String[] args) {
+        String content = """
+                <p><font color=\"#000000\">This is a test.</font></p>
+                """;
+        content = content.replaceAll("<font.*?>(.*?)</font>", "$1");
+        System.out.println(content);
     }
 
     @Override

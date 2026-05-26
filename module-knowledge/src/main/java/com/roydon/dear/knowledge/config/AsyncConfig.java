@@ -17,7 +17,6 @@ import java.util.concurrent.ThreadPoolExecutor;
 @Slf4j
 @Configuration
 @EnableAsync
-@EnableScheduling
 public class AsyncConfig {
     /**
      * 文件处理线程池
@@ -46,33 +45,17 @@ public class AsyncConfig {
     @Bean("eventListenerExecutor")
     public Executor eventListenerExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-
-        // 核心线程数
         executor.setCorePoolSize(4);
-
-        // 最大线程数
         executor.setMaxPoolSize(8);
-
-        // 队列容量
         executor.setQueueCapacity(50);
-
-        // 线程名前缀
-        executor.setThreadNamePrefix("event-listener-");
-
-        // 线程空闲时间
         executor.setKeepAliveSeconds(60);
-
-        // 拒绝策略
+        executor.setThreadNamePrefix("event-listener-");
         executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
-
         // 优雅关闭
         executor.setWaitForTasksToCompleteOnShutdown(true);
         executor.setAwaitTerminationSeconds(30);
-
         executor.initialize();
-
         log.info("事件监听线程池初始化完成");
-
         return executor;
     }
 }
