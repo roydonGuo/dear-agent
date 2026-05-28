@@ -49,15 +49,14 @@ public class DearAgent extends BaseAgent {
     private int maxRounds;
     private final List<Advisor> advisors;
     private final int maxReflectionRounds;
-    private final boolean isThinking;
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     public DearAgent(String name, ChatModel chatModel, List<ToolCallback> tools, String systemPrompt, int maxRounds,
                      ChatMemory chatMemory, List<Advisor> advisors, int maxReflectionRounds,
                      ChatConversationService conversationService, ChatMessageService messageService,
-                     AgentTaskManager taskManager, boolean think) {
-        super(name, chatModel, "websearch");
+                     AgentTaskManager taskManager) {
+        super(name, chatModel, "dearagent");
         this.tools = tools;
         this.systemPrompt = systemPrompt;
         this.maxRounds = maxRounds;
@@ -68,7 +67,6 @@ public class DearAgent extends BaseAgent {
         this.messageService = messageService;
         this.taskManager = taskManager;
         this.usedTools = new HashSet<>();
-        this.isThinking = think;
         initChatClient();
         if (this.chatClient == null) {
             throw new IllegalStateException("ChatClient 初始化失败！");
@@ -690,14 +688,9 @@ public class DearAgent extends BaseAgent {
             return this;
         }
 
-        public Builder think(boolean think) {
-            this.think = think;
-            return this;
-        }
-
         public DearAgent build() {
             if (chatModel == null) throw new IllegalArgumentException("chatModel 不能为空！");
-            return new DearAgent(name, chatModel, tools, systemPrompt, maxRounds, chatMemory, advisors, maxReflectionRounds, conversationService, messageService, taskManager, think);
+            return new DearAgent(name, chatModel, tools, systemPrompt, maxRounds, chatMemory, advisors, maxReflectionRounds, conversationService, messageService, taskManager);
         }
     }
 }

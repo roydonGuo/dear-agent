@@ -48,7 +48,6 @@ public abstract class BaseAgent {
     protected String currentConversationId;
     protected String currentQuestion;
     protected String currentRecommendations;
-    protected boolean isThinking = false;
 
     public BaseAgent(String name, ChatModel chatModel, String agentType) {
         this.name = name;
