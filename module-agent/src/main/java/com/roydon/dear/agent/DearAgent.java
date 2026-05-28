@@ -23,9 +23,12 @@ import org.springframework.ai.chat.messages.*;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
+import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.model.tool.ToolCallingChatOptions;
+import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.util.CollectionUtils;
+import org.springframework.util.StopWatch;
 import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
@@ -46,13 +49,14 @@ public class DearAgent extends BaseAgent {
     private int maxRounds;
     private final List<Advisor> advisors;
     private final int maxReflectionRounds;
+    private final boolean isThinking;
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     public DearAgent(String name, ChatModel chatModel, List<ToolCallback> tools, String systemPrompt, int maxRounds,
                      ChatMemory chatMemory, List<Advisor> advisors, int maxReflectionRounds,
                      ChatConversationService conversationService, ChatMessageService messageService,
-                     AgentTaskManager taskManager) {
+                     AgentTaskManager taskManager,boolean think) {
         super(name, chatModel, "websearch");
         this.tools = tools;
         this.systemPrompt = systemPrompt;
@@ -64,6 +68,7 @@ public class DearAgent extends BaseAgent {
         this.messageService = messageService;
         this.taskManager = taskManager;
         this.usedTools = new HashSet<>();
+        this.isThinking = think;
         initChatClient();
         if (this.chatClient == null) {
             throw new IllegalStateException("ChatClient 初始化失败！");
@@ -106,6 +111,8 @@ public class DearAgent extends BaseAgent {
     }
 
     private Flux<String> streamInternal(String conversationId, String question, boolean enableThinking, String fileIds) {
+        StopWatch streamInternal = new StopWatch("streamInternal");
+        streamInternal.start();
         List<Message> messages = Collections.synchronizedList(new ArrayList<>());
         boolean useMemory = conversationId != null && chatMemory != null;
         if (StringUtils.isBlank(conversationId)) conversationId = UUID.randomUUID().toString();
@@ -137,7 +144,7 @@ public class DearAgent extends BaseAgent {
             String title = question.length() > 32 ? question.substring(0, 32) : question;
             ChatConversation conversation = conversationService.getOrCreateBySessionId(conversationId, title);
             currentConversationNumericId = conversation.getId();
-            ChatMessage userMsg = messageService.saveUserMessage(conversation.getId(), question, null,  fileIds);
+            ChatMessage userMsg = messageService.saveUserMessage(conversation.getId(), question, null, fileIds);
             currentUserMessageId = userMsg.getId();
         }
 
@@ -151,9 +158,16 @@ public class DearAgent extends BaseAgent {
         AgentState agentState = new AgentState();
         List<JSONObject> toolCallMessages = Collections.synchronizedList(new ArrayList<>());
 
+        streamInternal.stop();
+        log.info("streamInternal-before: {}ms", streamInternal.getTotalTimeMillis());
+        // streamInternal-before: 788ms
+        streamInternal.start();
         // 轮询
         scheduleRound(messages, sink, roundCounter, hasSentFinalResult, finalAnswerBuffer, useMemory, conversationId, agentState, thinkingBuffer, enableThinking, toolCallMessages);
 
+        streamInternal.stop();
+        log.info("streamInternal-after: {}ms", streamInternal.getTotalTimeMillis());
+        // streamInternal-after: 789ms
         String finalConversationId = conversationId;
         String finalConversationId1 = conversationId;
         return sink.asFlux()
@@ -215,6 +229,7 @@ public class DearAgent extends BaseAgent {
 
         Disposable disposable = chatClient.prompt()
                 .messages(messages)
+                .options(buildThinkingOptions(enableThinking))
                 .stream()
                 .chatResponse()
                 .publishOn(Schedulers.boundedElastic())
@@ -240,11 +255,11 @@ public class DearAgent extends BaseAgent {
         String text = gen.getOutput().getText();
         List<AssistantMessage.ToolCall> tc = gen.getOutput().getToolCalls();
 
-        if (enableThinking && text == null) {
+        if (text == null) {
             String thinkingText = extractThinkingText(gen);
             if (StringUtils.isNotBlank(thinkingText)) {
                 thinkingBuffer.append(thinkingText);
-                if (enableThinking) sink.tryEmitNext(createThinkingResponse(thinkingText));
+                sink.tryEmitNext(createThinkingResponse(thinkingText));
             }
         }
 
@@ -343,7 +358,7 @@ public class DearAgent extends BaseAgent {
 
         StringBuilder finalTextBuffer = new StringBuilder();
 
-        Disposable disposable = chatClient.prompt().messages(messages).stream().chatResponse()
+        Disposable disposable = chatClient.prompt().messages(messages).options(buildThinkingOptions(enableThinking)).stream().chatResponse()
                 .publishOn(Schedulers.boundedElastic())
                 .doOnNext(chunk -> {
                     if (chunk == null || chunk.getResult() == null || chunk.getResult().getOutput() == null) return;
@@ -524,6 +539,13 @@ public class DearAgent extends BaseAgent {
                 .build());
     }
 
+    private ChatOptions buildThinkingOptions(boolean enableThinking) {
+        return OpenAiChatOptions.builder()
+                .extraBody(Map.of("enable_thinking", enableThinking))
+                .internalToolExecutionEnabled(false)
+                .build();
+    }
+
     private ToolCallback findTool(String name) {
         return tools.stream().filter(t -> t.getToolDefinition().name().equals(name)).findFirst().orElse(null);
     }
@@ -595,6 +617,7 @@ public class DearAgent extends BaseAgent {
         private ChatConversationService conversationService;
         private ChatMessageService messageService;
         private AgentTaskManager taskManager;
+        private boolean think;
 
         public Builder chatMemory(ChatMemory chatMemory) {
             this.chatMemory = chatMemory;
@@ -661,9 +684,14 @@ public class DearAgent extends BaseAgent {
             return this;
         }
 
+        public Builder think(boolean think) {
+            this.think = think;
+            return this;
+        }
+
         public DearAgent build() {
             if (chatModel == null) throw new IllegalArgumentException("chatModel 不能为空！");
-            return new DearAgent(name, chatModel, tools, systemPrompt, maxRounds, chatMemory, advisors, maxReflectionRounds, conversationService, messageService, taskManager);
+            return new DearAgent(name, chatModel, tools, systemPrompt, maxRounds, chatMemory, advisors, maxReflectionRounds, conversationService, messageService, taskManager, think);
         }
     }
 }

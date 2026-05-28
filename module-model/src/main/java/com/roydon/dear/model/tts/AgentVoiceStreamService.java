@@ -137,6 +137,10 @@ public class AgentVoiceStreamService {
         return parts;
     }
 
+    /**
+     * 清理文本
+     * 清理特殊字符、空格、Emoji表情、html标签
+     */
     private String cleanTextForTts(String text) {
         if (text == null) return null;
         text = text.replaceAll("\\|[-]+\\|[-]+\\|", "");

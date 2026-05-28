@@ -48,6 +48,7 @@ public abstract class BaseAgent {
     protected String currentConversationId;
     protected String currentQuestion;
     protected String currentRecommendations;
+    protected boolean isThinking = false;
 
     public BaseAgent(String name, ChatModel chatModel, String agentType) {
         this.name = name;
@@ -106,17 +107,49 @@ public abstract class BaseAgent {
         return chatMemory;
     }
 
-    protected String createResponse(String content, String type) { return AgentResponse.json(type, content); }
-    protected String createTextResponse(String content) { return AgentResponse.text(content); }
-    protected String createThinkingResponse(String content) { return AgentResponse.thinking(content); }
-    protected String createReferenceResponse(String content) { return AgentResponse.reference(content); }
-    protected String createErrorResponse(String content) { return AgentResponse.error(content); }
-    protected String createRecommendResponse(String content) { return AgentResponse.recommend(content); }
-    protected String createFunctionResponse(String content) { return AgentResponse.function(content); }
-    protected String createToolResponse(String content) { return AgentResponse.tool(content); }
-    protected String createMcpResponse(String content) { return AgentResponse.mcp(content); }
-    protected String createSkillResponse(String content) { return AgentResponse.skill(content); }
-    protected String createDoneResponse(String content) { return AgentResponse.done(content); }
+    protected String createResponse(String content, String type) {
+        return AgentResponse.json(type, content);
+    }
+
+    protected String createTextResponse(String content) {
+        return AgentResponse.text(content);
+    }
+
+    protected String createThinkingResponse(String content) {
+        return AgentResponse.thinking(content);
+    }
+
+    protected String createReferenceResponse(String content) {
+        return AgentResponse.reference(content);
+    }
+
+    protected String createErrorResponse(String content) {
+        return AgentResponse.error(content);
+    }
+
+    protected String createRecommendResponse(String content) {
+        return AgentResponse.recommend(content);
+    }
+
+    protected String createFunctionResponse(String content) {
+        return AgentResponse.function(content);
+    }
+
+    protected String createToolResponse(String content) {
+        return AgentResponse.tool(content);
+    }
+
+    protected String createMcpResponse(String content) {
+        return AgentResponse.mcp(content);
+    }
+
+    protected String createSkillResponse(String content) {
+        return AgentResponse.skill(content);
+    }
+
+    protected String createDoneResponse(String content) {
+        return AgentResponse.done(content);
+    }
 
     protected void recordFirstResponse() {
         if (firstResponseTime == 0 && startTime > 0) {
@@ -141,17 +174,26 @@ public abstract class BaseAgent {
         return null;
     }
 
-    protected void initTimers() { startTime = System.currentTimeMillis(); firstResponseTime = 0; }
+    protected void initTimers() {
+        startTime = System.currentTimeMillis();
+        firstResponseTime = 0;
+    }
 
-    protected long getTotalResponseTime() { return startTime == 0 ? 0 : System.currentTimeMillis() - startTime; }
+    protected long getTotalResponseTime() {
+        return startTime == 0 ? 0 : System.currentTimeMillis() - startTime;
+    }
 
     protected String getUsedToolsString() {
         return usedTools == null || usedTools.isEmpty() ? "" : String.join(",", usedTools);
     }
 
-    protected void clearUsedTools() { if (usedTools != null) usedTools.clear(); }
+    protected void clearUsedTools() {
+        if (usedTools != null) usedTools.clear();
+    }
 
-    protected void recordUsedTool(String toolName) { if (usedTools != null && toolName != null) usedTools.add(toolName); }
+    protected void recordUsedTool(String toolName) {
+        if (usedTools != null && toolName != null) usedTools.add(toolName);
+    }
 
     protected String generateRecommendations(String conversationId, String currentQuestion, String currentAnswer) {
         if (!enableRecommendations) return null;
@@ -165,7 +207,8 @@ public abstract class BaseAgent {
             messages.add(new UserMessage(currentQuestion));
             if (currentAnswer != null) messages.add(new AssistantMessage(currentAnswer));
 
-            BeanOutputConverter<List<String>> converter = new BeanOutputConverter<>(new ParameterizedTypeReference<>() {});
+            BeanOutputConverter<List<String>> converter = new BeanOutputConverter<>(new ParameterizedTypeReference<>() {
+            });
             messages.add(new UserMessage("请根据上述对话生成3个推荐问题。输出格式为：\n" + converter.getFormat()));
 
             String response = ChatClient.builder(chatModel).build().prompt().messages(messages).call().content();
@@ -186,14 +229,43 @@ public abstract class BaseAgent {
         }
     }
 
-    public void setChatMemory(ChatMemory chatMemory) { this.chatMemory = chatMemory; }
-    public void setConversationService(ChatConversationService conversationService) { this.conversationService = conversationService; }
-    public void setMessageService(ChatMessageService messageService) { this.messageService = messageService; }
-    public void setTaskManager(AgentTaskManager taskManager) { this.taskManager = taskManager; }
-    public Long getCurrentConversationNumericId() { return currentConversationNumericId; }
-    public Long getCurrentUserMessageId() { return currentUserMessageId; }
-    public String getCurrentConversationId() { return currentConversationId; }
-    public String getAgentType() { return agentType; }
-    public void setEnableRecommendations(boolean enableRecommendations) { this.enableRecommendations = enableRecommendations; }
-    public boolean isEnableRecommendations() { return enableRecommendations; }
+    public void setChatMemory(ChatMemory chatMemory) {
+        this.chatMemory = chatMemory;
+    }
+
+    public void setConversationService(ChatConversationService conversationService) {
+        this.conversationService = conversationService;
+    }
+
+    public void setMessageService(ChatMessageService messageService) {
+        this.messageService = messageService;
+    }
+
+    public void setTaskManager(AgentTaskManager taskManager) {
+        this.taskManager = taskManager;
+    }
+
+    public Long getCurrentConversationNumericId() {
+        return currentConversationNumericId;
+    }
+
+    public Long getCurrentUserMessageId() {
+        return currentUserMessageId;
+    }
+
+    public String getCurrentConversationId() {
+        return currentConversationId;
+    }
+
+    public String getAgentType() {
+        return agentType;
+    }
+
+    public void setEnableRecommendations(boolean enableRecommendations) {
+        this.enableRecommendations = enableRecommendations;
+    }
+
+    public boolean isEnableRecommendations() {
+        return enableRecommendations;
+    }
 }

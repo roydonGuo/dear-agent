@@ -2,12 +2,10 @@ package com.roydon.dear.web.controller;
 
 import com.roydon.dear.knowledge.domain.entity.convertor.KnowledgeFileConvertor;
 import com.roydon.dear.knowledge.service.IKnowledgeFileService;
-import io.micrometer.core.annotation.Timed;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -22,12 +20,5 @@ public class KnowledgeFileSegmentController {
     private final IKnowledgeFileService knowledgeFileService;
     private final KnowledgeFileConvertor knowledgeFileConvertor;
 
-
-    @Timed(value = "kf-segment.process", description = "Process file segments")
-    @PostMapping("/process-file")
-    public String processFile(Long fileId) {
-
-        return "处理成功";
-    }
 
 }
