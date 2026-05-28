@@ -72,6 +72,7 @@ public class AgentController {
      * 接收用户查询请求，根据配置参数执行智能问答，并返回Server-Sent Events(SSE)格式的流式响应。
      * 支持深度思考、联网搜索、语音输出等功能。
      * </p>
+     * 无法控制 think ：<a href="https://github.com/spring-projects/spring-ai/issues/4879">...</a>
      *
      * @param query          用户查询内容，不能为空
      * @param conversationId 会话ID，用于标识和追踪对话上下文
