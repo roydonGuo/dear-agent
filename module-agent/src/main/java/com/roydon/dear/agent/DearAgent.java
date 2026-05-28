@@ -56,7 +56,7 @@ public class DearAgent extends BaseAgent {
     public DearAgent(String name, ChatModel chatModel, List<ToolCallback> tools, String systemPrompt, int maxRounds,
                      ChatMemory chatMemory, List<Advisor> advisors, int maxReflectionRounds,
                      ChatConversationService conversationService, ChatMessageService messageService,
-                     AgentTaskManager taskManager,boolean think) {
+                     AgentTaskManager taskManager, boolean think) {
         super(name, chatModel, "websearch");
         this.tools = tools;
         this.systemPrompt = systemPrompt;
@@ -564,6 +564,12 @@ public class DearAgent extends BaseAgent {
         }
     }
 
+    /**
+     * todo 根据不同的平台获取指定的字段
+     * 阿里："reasoningContent"
+     * deepseek："reasoning_content"
+     * 谷歌："thinking"
+     */
     private String firstNonBlankThinking(Map<String, Object> metadata) {
         String thinking = null;
         for (String key : List.of("reasoningContent", "reasoning", "thinking", "thought", "reasoning_content")) {
