@@ -253,7 +253,7 @@ public class DearAgent extends BaseAgent {
         String text = gen.getOutput().getText();
         List<AssistantMessage.ToolCall> tc = gen.getOutput().getToolCalls();
 
-        if (text == null) {
+        if (text == null || text.isEmpty()) {
             String thinkingText = extractThinkingText(gen);
             if (StringUtils.isNotBlank(thinkingText)) {
                 thinkingBuffer.append(thinkingText);
