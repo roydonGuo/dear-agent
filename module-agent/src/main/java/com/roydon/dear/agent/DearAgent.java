@@ -167,7 +167,6 @@ public class DearAgent extends BaseAgent {
         log.info("streamInternal-after: {}ms", streamInternal.getTotalTimeMillis());
         // streamInternal-after: 789ms
         String finalConversationId = conversationId;
-        String finalConversationId1 = conversationId;
         return sink.asFlux()
                 .doOnNext(chunk -> {
                     recordFirstResponse();

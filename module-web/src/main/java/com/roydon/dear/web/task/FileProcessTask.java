@@ -32,16 +32,16 @@ public class FileProcessTask {
     private final EmbedProcess embedProcess;
 
     /** 每次调度最多处理的文件数量 */
-    private static final int MAX_FILES_PER_RUN = 5;
+    private static final int MAX_FILES_PER_RUN = 20;
     /** 文件间间隔（毫秒），缓解向量存储写入压力 */
-    private static final int INTERVAL_MS = 3000;
+    private static final int INTERVAL_MS = 1000;
 
     /**
      * 每10分钟扫描一次，补偿向量化未完成的文件。
      * 使用 fileProcessExecutor 线程池异步执行，不阻塞调度线程。
      */
     @Async("fileProcessExecutor")
-    @Scheduled(cron = "0 0/10 * * * ?")
+    @Scheduled(cron = "0 0/1 * * * ?")
     public void processFile() {
         log.info("开始执行文件向量化补偿任务");
 

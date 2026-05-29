@@ -74,13 +74,16 @@ public class AgentController {
      * </p>
      * 无法控制 think ：<a href="https://github.com/spring-projects/spring-ai/issues/4879">...</a>
      *
-     * @param query          用户查询内容，不能为空
-     * @param conversationId 会话ID，用于标识和追踪对话上下文
-     * @param think          是否启用深度思考模式，null或false时不启用
-     * @param webSearch      是否启用联网搜索，null或false时不启用
-     * @param voiceOutput    是否启用语音输出，默认为false
-     * @param voice          语音类型或音色标识，可选参数
-     * @param fileIds        关联的文件ID列表，可选参数
+     * @param query            用户查询内容，不能为空
+     * @param conversationId   会话ID，用于标识和追踪对话上下文
+     * @param think            是否启用深度思考模式，null或false时不启用
+     * @param webSearch        是否启用联网搜索，null或false时不启用
+     * @param voiceOutput      是否启用语音输出，默认为false
+     * @param voice            语音类型或音色标识，可选参数
+     * @param fileIds          关联的文件ID列表，可选参数
+     * @param useKnowledgeBase 自由决策检索知识库，优先级大于knowledgeBaseIds，可选参数
+     * @param knowledgeBaseIds 关联的文件库ID列表，可选参数
+     *                         </p>
      * @return Flux<String>  返回响应式流式数据，包含AI回复内容或错误信息
      */
     @Timed(value = "agent.chat.stream", description = "Agent chat stream endpoint")
@@ -92,7 +95,9 @@ public class AgentController {
                                         @RequestParam(required = false) Boolean webSearch,
                                         @RequestParam(required = false, defaultValue = "false") Boolean voiceOutput,
                                         @RequestParam(required = false) String voice,
-                                        @RequestParam(required = false) String fileIds) {
+                                        @RequestParam(required = false) String fileIds,
+                                        @RequestParam(required = false) Boolean useKnowledgeBase,
+                                        @RequestParam(required = false) String knowledgeBaseIds) {
         boolean thinkEnabled = Boolean.TRUE.equals(think);
         boolean webSearchEnabled = Boolean.TRUE.equals(webSearch);
         boolean voiceEnabled = Boolean.TRUE.equals(voiceOutput);
@@ -176,7 +181,7 @@ public class AgentController {
             AtomicReference<String> prompt = new AtomicReference<>("""
                     # 用户携带了以下文件描述信息：
                     """);
-            chatFileList.forEach(chatFile->{
+            chatFileList.forEach(chatFile -> {
                 prompt.set(prompt + """
                         ## 文件名：%s
                         ## 文件描述：%s

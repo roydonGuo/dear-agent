@@ -24,4 +24,14 @@ alibaba:
       language-type: Chinese
 elasticsearch:
   host: http://43.240.221.8:9200
-  api-key: Z2tHQlZaNEJ4UXA4Y0VlYUdSanQ6VzhZTnJ0MzlTY21oVkpvdnYwTTRNZw==
+  api-key: eDdVQWRKNEJncGp1Q0YtR2oxWlY6czE5d21XQXdSN20xNHVPQkpadDVIdw==
+#  api-key: Z2tHQlZaNEJ4UXA4Y0VlYUdSanQ6VzhZTnJ0MzlTY21oVkpvdnYwTTRNZw==
+# 禁用spring retry
+spring:
+  ai:
+    retry:
+      maxAttempts: 1
+      backoff:
+        initialInterval: 2000
+        multiplier: 5
+        maxInterval: 180000
