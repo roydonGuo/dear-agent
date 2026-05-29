@@ -30,6 +30,10 @@
             <groupId>com.roydon.dear</groupId>
             <artifactId>module-model</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.roydon.dear</groupId>
+            <artifactId>module-knowledge</artifactId>
+        </dependency>
 <!--        <dependency>-->
 <!--            <groupId>org.springframework.ai</groupId>-->
 <!--            <artifactId>spring-ai-alibaba-agent-framework</artifactId>-->

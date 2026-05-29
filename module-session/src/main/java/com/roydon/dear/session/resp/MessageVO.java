@@ -19,5 +19,6 @@ public class MessageVO {
     private LocalDateTime createTime;
     private String fileid;
     private String recommend;
+    private String knowledge;
     private List<AiChatFile> chatFileList;
 }

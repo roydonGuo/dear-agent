@@ -1,11 +1,9 @@
 package com.roydon.dear.web.controller;
 
-import cn.hutool.core.collection.CollUtil;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.roydon.dear.common.BaseResult;
 import com.roydon.dear.core.service.FileStorage;
-import io.micrometer.core.annotation.Timed;
 import com.roydon.dear.prompt.entity.AiPrompt;
 import com.roydon.dear.prompt.service.AiPromptService;
 import com.roydon.dear.session.entity.AiChatFile;
@@ -19,6 +17,7 @@ import com.roydon.dear.session.resp.SessionListVO;
 import com.roydon.dear.session.service.ChatConversationService;
 import com.roydon.dear.session.service.ChatMessageService;
 import com.roydon.dear.session.service.IAiChatFileService;
+import io.micrometer.core.annotation.Timed;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -29,7 +28,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -169,6 +167,7 @@ public class SessionController {
                     current.setTools(msg.getTools());
                     current.setReference(msg.getReference());
                     current.setRecommend(msg.getRecommend());
+                    current.setKnowledge(msg.getKnowledge());
                 }
             }
         }

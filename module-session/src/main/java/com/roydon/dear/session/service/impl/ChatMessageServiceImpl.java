@@ -117,7 +117,7 @@ public class ChatMessageServiceImpl extends ServiceImpl<ChatMessageMapper, ChatM
     @Override
     public ChatMessage saveAssistantMessage(Long conversationId, Long replyId, String content,
                                             String thinking, String tools, String reference,
-                                            String recommend, Long firstResponseTime,
+                                            String recommend, String knowledge, Long firstResponseTime,
                                             Long totalResponseTime, String fileIds) {
         ChatMessage msg = new ChatMessage();
         msg.setConversationId(conversationId);
@@ -128,6 +128,7 @@ public class ChatMessageServiceImpl extends ServiceImpl<ChatMessageMapper, ChatM
         msg.setTools(tools);
         msg.setReference(reference);
         msg.setRecommend(recommend);
+        msg.setKnowledge(knowledge);
         msg.setFileid(null);
         msg.setFileIds(fileIds);
         msg.setFirstResponseTime(firstResponseTime);

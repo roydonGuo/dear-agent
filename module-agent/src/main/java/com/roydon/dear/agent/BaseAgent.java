@@ -146,6 +146,10 @@ public abstract class BaseAgent {
         return AgentResponse.skill(content);
     }
 
+    protected String createKnowledgeResponse(String content, Integer count) {
+        return AgentResponse.knowledge(content, count);
+    }
+
     protected String createDoneResponse(String content) {
         return AgentResponse.done(content);
     }
