@@ -170,7 +170,7 @@ public class WebSearchReactAgent extends BaseAgent {
             messageService.saveAssistantMessage(
                     currentConversationNumericId, currentUserMessageId,
                     finalAnswerBuffer.toString(), thinkingBuffer.toString(),
-                    toolsStr, referenceJson, currentRecommendations,
+                    toolsStr, referenceJson, currentRecommendations, null,
                     firstResponseTime, totalResponseTime, fileIds);
             String lastMsg = finalAnswerBuffer.length() > 64
                     ? finalAnswerBuffer.substring(0, 64) : finalAnswerBuffer.toString();

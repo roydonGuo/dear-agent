@@ -6,6 +6,7 @@ import com.alibaba.cloud.ai.graph.skills.registry.filesystem.FileSystemSkillRegi
 import com.roydon.dear.agent.DearAgent;
 import com.roydon.dear.common.AgentResponse;
 import com.roydon.dear.common.manager.AgentTaskManager;
+import com.roydon.dear.knowledge.rag.retriever.KnowledgeRetrievalService;
 import com.roydon.dear.common.prompts.ReactAgentPrompts;
 import com.roydon.dear.model.registry.ModelRegistry;
 import com.roydon.dear.model.tts.AgentVoiceStreamService;
@@ -66,6 +67,9 @@ public class AgentController {
     @Autowired
     private BusinessMetrics businessMetrics;
 
+    @Autowired
+    private KnowledgeRetrievalService knowledgeRetrievalService;
+
     /**
      * 智能问答流式接口
      * <p>
@@ -74,25 +78,31 @@ public class AgentController {
      * </p>
      * 无法控制 think ：<a href="https://github.com/spring-projects/spring-ai/issues/4879">...</a>
      *
-     * @param query          用户查询内容，不能为空
-     * @param conversationId 会话ID，用于标识和追踪对话上下文
-     * @param think          是否启用深度思考模式，null或false时不启用
-     * @param webSearch      是否启用联网搜索，null或false时不启用
-     * @param voiceOutput    是否启用语音输出，默认为false
-     * @param voice          语音类型或音色标识，可选参数
-     * @param fileIds        关联的文件ID列表，可选参数
+     * @param query            用户查询内容，不能为空
+     * @param conversationId   会话ID，用于标识和追踪对话上下文
+     * @param think            是否启用深度思考模式，null或false时不启用
+     * @param webSearch        是否启用联网搜索，null或false时不启用
+     * @param voiceOutput      是否启用语音输出，默认为false
+     * @param voice            语音类型或音色标识，可选参数
+     * @param fileIds          关联的文件ID列表，可选参数
+     * @param useKnowledgeBase 自由决策检索知识库，优先级大于knowledgeBaseIds，可选参数
+     * @param knowledgeBaseIds 关联的文件库ID列表，可选参数
+     *                         </p>
      * @return Flux<String>  返回响应式流式数据，包含AI回复内容或错误信息
      */
     @Timed(value = "agent.chat.stream", description = "Agent chat stream endpoint")
     @GetMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @Operation(summary = "智能问答", description = "接收用户查询并返回流式响应，使用联网搜索获取信息")
-    public Flux<String> webSearchStream(@RequestParam String query,
-                                        @RequestParam String conversationId,
-                                        @RequestParam(required = false) Boolean think,
-                                        @RequestParam(required = false) Boolean webSearch,
-                                        @RequestParam(required = false, defaultValue = "false") Boolean voiceOutput,
-                                        @RequestParam(required = false) String voice,
-                                        @RequestParam(required = false) String fileIds) {
+    public Flux<String> chatStream(@RequestParam String query,
+                                   @RequestParam String conversationId,
+                                   @RequestParam(required = false) Boolean think,
+                                   @RequestParam(required = false) String thinkDepth,
+                                   @RequestParam(required = false) Boolean webSearch,
+                                   @RequestParam(required = false, defaultValue = "false") Boolean voiceOutput,
+                                   @RequestParam(required = false) String voice,
+                                   @RequestParam(required = false) String fileIds,
+                                   @RequestParam(required = false) Boolean useKnowledgeBase,
+                                   @RequestParam(required = false) String knowledgeBaseIds) {
         boolean thinkEnabled = Boolean.TRUE.equals(think);
         boolean webSearchEnabled = Boolean.TRUE.equals(webSearch);
         boolean voiceEnabled = Boolean.TRUE.equals(voiceOutput);
@@ -110,7 +120,7 @@ public class AgentController {
         try {
             // 初始化Agent实例并执行流式问答
             DearAgent dearAgent = initDearAgent(conversationId, webSearchEnabled, fileIds);
-            Flux<String> agentStream = dearAgent.stream(conversationId, query, thinkEnabled, fileIds);
+            Flux<String> agentStream = dearAgent.stream(conversationId, query, thinkEnabled, fileIds, useKnowledgeBase, knowledgeBaseIds);
 
             // 根据配置决定是否添加语音输出功能
             if (voiceEnabled) {
@@ -176,7 +186,7 @@ public class AgentController {
             AtomicReference<String> prompt = new AtomicReference<>("""
                     # 用户携带了以下文件描述信息：
                     """);
-            chatFileList.forEach(chatFile->{
+            chatFileList.forEach(chatFile -> {
                 prompt.set(prompt + """
                         ## 文件名：%s
                         ## 文件描述：%s
@@ -217,6 +227,7 @@ public class AgentController {
                 .conversationService(conversationService)
                 .messageService(messageService)
                 .taskManager(taskManager)
+                .knowledgeRetrievalService(knowledgeRetrievalService)
                 .maxRounds(50)
                 .build();
         log.debug("初始化DearReact完成");

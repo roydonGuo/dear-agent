@@ -1,0 +1,37 @@
+mysql:
+  host: 43.240.221.8
+  username: roydon
+  password: roydon#Mysql
+redis:
+  host: 43.240.221.8
+  port: 6379
+  database: 23
+  password: roydon#Redis
+minio:
+  url: http://43.240.221.8:9000/
+  accessKey: roydon
+  secretKey: roydon#Minio
+  bucketName: dear-agent
+  endpoint: http://43.240.221.8:9000/
+# 阿里云 TTS 配置
+alibaba:
+  dashscope:
+    tts:
+      api-key: sk-cec420dff8b04f5f8aedf0d5e2c98a50
+      base-url: https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation
+      model: qwen3-tts-flash
+      voice: Cherry
+      language-type: Chinese
+elasticsearch:
+  host: http://43.240.221.8:9200
+  api-key: eDdVQWRKNEJncGp1Q0YtR2oxWlY6czE5d21XQXdSN20xNHVPQkpadDVIdw==
+#  api-key: Z2tHQlZaNEJ4UXA4Y0VlYUdSanQ6VzhZTnJ0MzlTY21oVkpvdnYwTTRNZw==
+# 禁用spring retry
+spring:
+  ai:
+    retry:
+      maxAttempts: 1
+      backoff:
+        initialInterval: 2000
+        multiplier: 5
+        maxInterval: 180000

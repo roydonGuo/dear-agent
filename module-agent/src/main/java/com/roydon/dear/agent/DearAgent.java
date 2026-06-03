@@ -10,6 +10,7 @@ import com.roydon.dear.common.domain.agent.RoundState;
 import com.roydon.dear.common.domain.agent.SearchResult;
 import com.roydon.dear.common.manager.AgentTaskManager;
 import com.roydon.dear.common.prompts.ReactAgentPrompts;
+import com.roydon.dear.knowledge.rag.retriever.KnowledgeRetrievalService;
 import com.roydon.dear.session.entity.ChatConversation;
 import com.roydon.dear.session.entity.ChatMessage;
 import com.roydon.dear.session.service.ChatConversationService;
@@ -29,6 +30,7 @@ import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StopWatch;
+import org.springframework.web.bind.annotation.RequestParam;
 import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
@@ -49,13 +51,16 @@ public class DearAgent extends BaseAgent {
     private int maxRounds;
     private final List<Advisor> advisors;
     private final int maxReflectionRounds;
+    private final KnowledgeRetrievalService knowledgeRetrievalService;
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
+
+    private String currentKnowledge;
 
     public DearAgent(String name, ChatModel chatModel, List<ToolCallback> tools, String systemPrompt, int maxRounds,
                      ChatMemory chatMemory, List<Advisor> advisors, int maxReflectionRounds,
                      ChatConversationService conversationService, ChatMessageService messageService,
-                     AgentTaskManager taskManager) {
+                     AgentTaskManager taskManager, KnowledgeRetrievalService knowledgeRetrievalService) {
         super(name, chatModel, "dearagent");
         this.tools = tools;
         this.systemPrompt = systemPrompt;
@@ -66,6 +71,7 @@ public class DearAgent extends BaseAgent {
         this.conversationService = conversationService;
         this.messageService = messageService;
         this.taskManager = taskManager;
+        this.knowledgeRetrievalService = knowledgeRetrievalService;
         this.usedTools = new HashSet<>();
         initChatClient();
         if (this.chatClient == null) {
@@ -89,26 +95,30 @@ public class DearAgent extends BaseAgent {
 
     @Override
     public Flux<String> execute(String conversationId, String question) {
-        return streamInternal(conversationId, question, true, null);
+        return streamInternal(conversationId, question, true, null, null, null);
     }
 
     public Flux<String> stream(String question) {
-        return streamInternal(null, question, true, null);
+        return streamInternal(null, question, true, null, null, null);
     }
 
     public Flux<String> stream(String conversationId, String question) {
-        return streamInternal(conversationId, question, true, null);
+        return streamInternal(conversationId, question, true, null, null, null);
     }
 
     public Flux<String> stream(String conversationId, String question, boolean enableThinking) {
-        return streamInternal(conversationId, question, enableThinking, null);
+        return streamInternal(conversationId, question, enableThinking, null, null, null);
     }
 
     public Flux<String> stream(String conversationId, String question, boolean enableThinking, String fileIds) {
-        return streamInternal(conversationId, question, enableThinking, fileIds);
+        return streamInternal(conversationId, question, enableThinking, fileIds, null, null);
     }
 
-    private Flux<String> streamInternal(String conversationId, String question, boolean enableThinking, String fileIds) {
+    public Flux<String> stream(String conversationId, String question, boolean enableThinking, String fileIds, Boolean useKnowledgeBase, String knowledgeBaseIds) {
+        return streamInternal(conversationId, question, enableThinking, fileIds, useKnowledgeBase, knowledgeBaseIds);
+    }
+
+    private Flux<String> streamInternal(String conversationId, String question, boolean enableThinking, String fileIds, Boolean useKnowledgeBase, String knowledgeBaseIds) {
         StopWatch streamInternal = new StopWatch("streamInternal");
         streamInternal.start();
         List<Message> messages = Collections.synchronizedList(new ArrayList<>());
@@ -135,6 +145,28 @@ public class DearAgent extends BaseAgent {
         }
 
         loadChatHistory(conversationId, messages, true, true);
+
+        // 知识库检索
+        if (Boolean.TRUE.equals(useKnowledgeBase) && knowledgeRetrievalService != null) {
+            List<Long> kbIds = parseKnowledgeBaseIds(knowledgeBaseIds);
+            List<org.springframework.ai.document.Document> knowledgeDocs =
+                    knowledgeRetrievalService.retrieve(question, kbIds, 5);
+            if (!knowledgeDocs.isEmpty()) {
+                // SSE 推送（不含 content 文本，避免数据量过大）
+                String knowledgeJson = JSON.toJSONString(knowledgeDocs.stream().map(doc -> {
+                    JSONObject item = new JSONObject();
+                    item.put("score", doc.getScore());
+                    item.put("metadata", doc.getMetadata());
+                    return item;
+                }).toList());
+                currentKnowledge = knowledgeJson;
+                sink.tryEmitNext(createKnowledgeResponse(knowledgeJson, knowledgeDocs.size()));
+                // 注入 LLM 上下文（含完整内容）
+                String knowledgeCtx = knowledgeRetrievalService.formatAsContext(knowledgeDocs);
+                messages.add(new SystemMessage(knowledgeCtx));
+            }
+        }
+
         messages.add(new UserMessage("<question>" + question + "</question>"));
         currentQuestion = question;
 
@@ -167,7 +199,6 @@ public class DearAgent extends BaseAgent {
         log.info("streamInternal-after: {}ms", streamInternal.getTotalTimeMillis());
         // streamInternal-after: 789ms
         String finalConversationId = conversationId;
-        String finalConversationId1 = conversationId;
         return sink.asFlux()
                 .doOnNext(chunk -> {
                     recordFirstResponse();
@@ -209,6 +240,7 @@ public class DearAgent extends BaseAgent {
                     toolsStr,
                     referenceJson,
                     currentRecommendations,
+                    currentKnowledge,
                     firstResponseTime,
                     totalResponseTime,
                     fileIds);
@@ -253,7 +285,7 @@ public class DearAgent extends BaseAgent {
         String text = gen.getOutput().getText();
         List<AssistantMessage.ToolCall> tc = gen.getOutput().getToolCalls();
 
-        if (text == null) {
+        if (text == null || text.isEmpty()) {
             String thinkingText = extractThinkingText(gen);
             if (StringUtils.isNotBlank(thinkingText)) {
                 thinkingBuffer.append(thinkingText);
@@ -526,6 +558,22 @@ public class DearAgent extends BaseAgent {
         }
     }
 
+    private List<Long> parseKnowledgeBaseIds(String knowledgeBaseIds) {
+        if (knowledgeBaseIds == null || knowledgeBaseIds.isBlank()) {
+            return java.util.Collections.emptyList();
+        }
+        try {
+            return java.util.Arrays.stream(knowledgeBaseIds.split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .map(Long::valueOf)
+                    .toList();
+        } catch (NumberFormatException e) {
+            log.warn("解析 knowledgeBaseIds 失败: {}", knowledgeBaseIds, e);
+            return java.util.Collections.emptyList();
+        }
+    }
+
     private String getSafe(JsonNode node, String field) {
         JsonNode v = node.get(field);
         return v == null || v.isNull() ? null : v.asText();
@@ -539,7 +587,8 @@ public class DearAgent extends BaseAgent {
 
     private ChatOptions buildThinkingOptions(boolean enableThinking) {
         return OpenAiChatOptions.builder()
-                .extraBody(Map.of("enable_thinking", enableThinking))
+                .extraBody(Map.of("enable_thinking", enableThinking,
+                        "reasoning_effort", "high")) // 控制DeepSeek-V4系列模型的推理力度,可选值：high：高力度推理；max：最大力度推理
                 .internalToolExecutionEnabled(false)
                 .build();
     }
@@ -621,6 +670,7 @@ public class DearAgent extends BaseAgent {
         private ChatConversationService conversationService;
         private ChatMessageService messageService;
         private AgentTaskManager taskManager;
+        private KnowledgeRetrievalService knowledgeRetrievalService;
         private boolean think;
 
         public Builder chatMemory(ChatMemory chatMemory) {
@@ -640,6 +690,11 @@ public class DearAgent extends BaseAgent {
 
         public Builder taskManager(AgentTaskManager taskManager) {
             this.taskManager = taskManager;
+            return this;
+        }
+
+        public Builder knowledgeRetrievalService(KnowledgeRetrievalService knowledgeRetrievalService) {
+            this.knowledgeRetrievalService = knowledgeRetrievalService;
             return this;
         }
 
@@ -690,7 +745,7 @@ public class DearAgent extends BaseAgent {
 
         public DearAgent build() {
             if (chatModel == null) throw new IllegalArgumentException("chatModel 不能为空！");
-            return new DearAgent(name, chatModel, tools, systemPrompt, maxRounds, chatMemory, advisors, maxReflectionRounds, conversationService, messageService, taskManager);
+            return new DearAgent(name, chatModel, tools, systemPrompt, maxRounds, chatMemory, advisors, maxReflectionRounds, conversationService, messageService, taskManager, knowledgeRetrievalService);
         }
     }
 }

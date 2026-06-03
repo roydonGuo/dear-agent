@@ -28,6 +28,7 @@ public interface ChatMessageService extends IService<ChatMessage> {
                                      String tools,
                                      String reference,
                                      String recommend,
+                                     String knowledge,
                                      Long firstResponseTime,
                                      Long totalResponseTime,
                                      String fileIds);

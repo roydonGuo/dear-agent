@@ -43,7 +43,9 @@ public class SegmentSaveHandler extends AbstractFileProcessHandler {
             knowledgeSegment.setFileId(fileDO.getId());
             knowledgeSegment.setText(document.getText());
             knowledgeSegment.setChunkId(String.valueOf((Long) document.getMetadata().get(MetadataKeyConstant.CHUNK_ID)));
+//            knowledgeSegment.setBaseId(fileDO.getBaseId()); todo @roydon soon
             Map<String, Object> metadata = document.getMetadata();
+            metadata.put(MetadataKeyConstant.BASE_ID, fileDO.getBaseId());
             metadata.put(MetadataKeyConstant.FILE_ID, fileDO.getId());
             metadata.put(MetadataKeyConstant.FILE_NAME, fileDO.getName());
             metadata.put(MetadataKeyConstant.PATH, fileDO.getStoragePath());

@@ -73,7 +73,19 @@
       "Bash(./mvnw --version)",
       "Bash(git checkout *)",
       "Bash(where mvn.cmd)",
-      "Bash(/c/Users/31330/.m2/wrapper/dists/apache-maven-3.9.11-bin/6mqf5t809d9geo83kj4ttckcbc/apache-maven-3.9.11/bin/mvn compile *)"
+      "Bash(/c/Users/31330/.m2/wrapper/dists/apache-maven-3.9.11-bin/6mqf5t809d9geo83kj4ttckcbc/apache-maven-3.9.11/bin/mvn compile *)",
+      "Bash(jar xf *)",
+      "Bash(javap -p -c /c/Users/31330/.m2/repository/org/springframework/ai/spring-ai-elasticsearch-store/1.1.3/org/springframework/ai/vectorstore/elasticsearch/ElasticsearchVectorStore.class)",
+      "Bash(javap -p -c /c/Users/31330/.m2/repository/org/springframework/ai/spring-ai-elasticsearch-store/1.1.3/org/springframework/ai/vectorstore/elasticsearch/ElasticsearchVectorStoreOptions.class)",
+      "Bash(javap -p /c/Users/31330/.m2/repository/org/springframework/ai/spring-ai-elasticsearch-store/1.1.3/org/springframework/ai/vectorstore/elasticsearch/ElasticsearchVectorStoreOptions.class)",
+      "Bash(javap -p /c/Users/31330/.m2/repository/org/springframework/ai/spring-ai-elasticsearch-store/1.1.3/org/springframework/ai/vectorstore/elasticsearch/SimilarityFunction.class)",
+      "Bash(javap -p org/springframework/ai/vectorstore/elasticsearch/ElasticsearchVectorStoreOptions.class)",
+      "Read(//c/ProgramData/chocolatey/**)",
+      "Bash(find /c -name \"mvn.cmd\" -type f)",
+      "Bash(cmd //c \"where mvn\")",
+      "Bash(cmd //c \"dir /s /b D:\\\\apache-maven* 2>nul & dir /s /b C:\\\\Users\\\\31330\\\\.m2\\\\wrapper 2>nul & where java 2>nul\")",
+      "Bash(\"/c/Users/31330/.m2/wrapper/dists/apache-maven-3.9.11-bin/6mqf5t809d9geo83kj4ttckcbc/apache-maven-3.9.11/bin/mvn\" -f \"D:/JetBrains/JavaProjects/dear-agent\" compile -DskipTests)",
+      "Bash(\"/c/Users/31330/.m2/wrapper/dists/apache-maven-3.9.11-bin/6mqf5t809d9geo83kj4ttckcbc/apache-maven-3.9.11/bin/mvn\" -f \"D:/JetBrains/JavaProjects/dear-agent\" dependency:resolve -pl module-knowledge -DskipTests -q)"
     ]
   },
   "enabledPlugins": {

@@ -12,6 +12,7 @@ public class AgentResponse {
     public static final String TYPE_REFERENCE = "reference";
     public static final String TYPE_ERROR = "error";
     public static final String TYPE_RECOMMEND = "recommend";
+    public static final String TYPE_KNOWLEDGE = "knowledge";
     public static final String TYPE_EXPRESSION = "expression";
     public static final String TYPE_DONE = "done";
     public static final String TYPE_AUDIO = "audio";
@@ -75,6 +76,10 @@ public class AgentResponse {
         return new AgentResponse(TYPE_ERROR, content).toJson();
     }
 
+    public static String knowledge(String content, Integer count) {
+        return new AgentResponse(TYPE_KNOWLEDGE, content, count).toJson();
+    }
+
     public static String recommend(String content) {
         return recommend(content, null);
     }
@@ -122,7 +127,7 @@ public class AgentResponse {
         if (content != null) obj.put("content", content);
         if (count != null) obj.put("count", count);
         if (data != null) {
-            if ((TYPE_REFERENCE.equals(type) || TYPE_RECOMMEND.equals(type)) && content != null) {
+            if ((TYPE_REFERENCE.equals(type) || TYPE_RECOMMEND.equals(type) || TYPE_KNOWLEDGE.equals(type)) && content != null) {
                 try {
                     obj.put("content", JSON.parse(content));
                 } catch (Exception e) {

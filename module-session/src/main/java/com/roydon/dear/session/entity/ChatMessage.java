@@ -35,6 +35,8 @@ public class ChatMessage implements Serializable {
 
     private String recommend;
 
+    private String knowledge;
+
     private String fileid;
 
     private String fileIds;
