@@ -39,6 +39,7 @@
 - **Agent 间上下文传递** — 无共享上下文或消息总线
 - **层级任务管理** — 当前 `agent:task:{conversationId}` key 假设单任务，需层级化
 - **Sub-Agent 流式事件类型** — SSE 协议需区分不同 Agent 的输出
+- **多 Agent 独立 Controller** — 新增 `MultiAgentController`，在 Web 层与原有 `AgentController` 隔离
 
 ---
 
@@ -47,33 +48,47 @@
 ### 2.1 目标架构
 
 ```
-                        ┌──────────────────────────┐
-                        │     AgentController       │  ← Web 层，路由到编排器
-                        └────────────┬─────────────┘
-                                     │
-                        ┌────────────▼─────────────┐
-                        │   OrchestratorAgent       │  ← 新增：编排 Agent
-                        │   extends BaseAgent       │
-                        │                           │
-                        │   ┌───────────────────┐   │
-                        │   │  AgentRegistry     │   │  ← 新增：Agent 注册中心
-                        │   │  (Spring Bean)     │   │
-                        │   └───────┬───────────┘   │
-                        │           │               │
-                        │   ┌───────▼───────────┐   │
-                        │   │  AgentToolAdapter  │   │  ← 新增：Agent → Tool 适配
-                        │   └───────┬───────────┘   │
-                        └───────────┼───────────────┘
-                                    │
-              ┌─────────────────────┼─────────────────────┐
-              │                     │                     │
-     ┌────────▼────────┐  ┌────────▼────────┐  ┌────────▼────────┐
-     │  DearAgent       │  │  PlanAgent       │  │  WorkerAgent     │
-     │  (通用对话)       │  │  (任务规划)       │  │  (独立执行)       │
-     │  extends         │  │  (Phase 2)       │  │  (Phase 3)       │
-     │  BaseAgent       │  │                  │  │                  │
-     └─────────────────┘  └─────────────────┘  └─────────────────┘
+   ┌──────────────────────────────────────────────────┐
+   │                   Web 层                          │
+   │                                                   │
+   │  ┌─────────────────────┐  ┌─────────────────────┐ │
+   │  │  AgentController     │  │ MultiAgentController │ │
+   │  │  (保留，单 Agent)     │  │ (新增，多 Agent 协同) │ │
+   │  │  GET /agent/chat/    │  │ POST /multi-agent/   │ │
+   │  │       stream         │  │      collaborate/    │ │
+   │  └─────────┬───────────┘  │      stream           │ │
+   │            │              └──────────┬──────────┘ │
+   └────────────┼─────────────────────────┼────────────┘
+                │                         │
+       ┌────────▼────────┐     ┌──────────▼───────────┐
+       │   DearAgent      │     │   OrchestratorAgent   │
+       │   (简单对话)       │     │   extends BaseAgent   │
+       │   extends        │     │                       │
+       │   BaseAgent      │     │   ┌─────────────────┐ │
+       └──────────────────┘     │   │  AgentRegistry   │ │
+                                │   │  (Spring Bean)   │ │
+                                │   └────────┬────────┘ │
+                                │   ┌────────▼────────┐ │
+                                │   │ AgentToolAdapter │ │
+                                │   └────────┬────────┘ │
+                                └────────────┼──────────┘
+                                             │
+              ┌──────────────────────────────┼──────────────────┐
+              │                              │                  │
+     ┌────────▼────────┐  ┌─────────────────▼──┐  ┌────────────▼───┐
+     │ WebSearchAgent   │  │  PlanExecute       │  │  WorkerAgent    │
+     │ (联网搜索)        │  │  Orchestrator      │  │  (独立执行)      │
+     │ extends          │  │  (Phase 2)         │  │  (Phase 3)      │
+     │ BaseAgent        │  │                    │  │                 │
+     └──────────────────┘  └────────────────────┘  └─────────────────┘
 ```
+
+**两条独立的调用路径：**
+
+| 路径 | Controller | Agent | 场景 |
+|------|-----------|-------|------|
+| 简单对话 | `AgentController` → `DearAgent` | 单 Agent，直接回答 | 日常聊天、简单问答、文件操作 |
+| 多 Agent 协同 | `MultiAgentController` → `OrchestratorAgent` | 编排器调度 Sub-Agent | 深度研究、复杂多步骤任务 |
 
 ### 2.2 三层演进路线
 
@@ -83,9 +98,14 @@ Phase 1 ──── Agent-as-Tool ────▶  Phase 2 ──── Plan-Ex
 2 周                            2-3 周                            按需
 ```
 
-### 2.3 新增模块
+### 2.3 新增/变更模块
 
 ```
+module-web/
+├── controller/
+│   ├── AgentController.java            # 已有，不动 — 单 Agent 对话
+│   └── MultiAgentController.java       # 新增 — 多 Agent 协同入口
+
 module-agent/
 ├── BaseAgent.java                    # 已有，增加 agentRole/capabilities 字段
 ├── DearAgent.java                    # 已有，不变
@@ -117,7 +137,8 @@ module-agent/
 - 建立 Agent 注册/发现机制
 - 子 Agent 可通过 Tool Calling 被编排 Agent 调度
 - 前端无感 — SSE 协议向后兼容
-- 现有的单一 DearAgent 行为不受影响
+- `AgentController` 和 `DearAgent` **零改动**，现有简单对话路径完全不受影响
+- 多 Agent 功能通过新增 `MultiAgentController` 独立暴露
 
 ### 3.2 Agent 元信息接口
 
@@ -178,6 +199,10 @@ public class AgentRegistry {
 
     public Set<String> getAgentNames() {
         return Collections.unmodifiableSet(agents.keySet());
+    }
+
+    public AgentMetadata getMetadata(String name) {
+        return metadata.get(name);
     }
 
     /**
@@ -353,36 +378,167 @@ public class WebSearchReactAgent extends BaseAgent implements AgentMetadata {
 }
 ```
 
-### 3.7 AgentController 变更（路由到编排器）
+### 3.7 新增 MultiAgentController
+
+`AgentController` **保持原样不动**，继续使用 `DearAgent` 处理简单单 Agent 对话场景。多 Agent 协同场景走全新的 `MultiAgentController`。
 
 ```java
-// AgentController.java — initDearAgent() 方法替换为
+// module-web/src/main/java/.../controller/MultiAgentController.java
 
-private BaseAgent initAgent(String conversationId, boolean webSearch, String fileIds) {
-    // ... 系统提示词、工具、ChatModel 加载逻辑不变 ...
+package com.roydon.dear.web.controller;
 
-    // 构建编排器
-    SimpleOrchestrator orchestrator = SimpleOrchestrator.builder()
-            .name("orchestrator")
-            .chatModel(chatModel)
-            .tools(mcpToolManager.getAllTools())          // 普通工具
-            .advisors(skillAdvisor)
-            .systemPrompt(systemPrompt)
-            .conversationService(conversationService)
-            .messageService(messageService)
-            .taskManager(taskManager)
-            .knowledgeRetrievalService(knowledgeRetrievalService)
-            .maxRounds(50)
-            .agentRegistry(agentRegistry)                  // ← 新增：注入 Agent 注册中心
-            .build();
+import com.roydon.dear.agent.DearAgent;
+import com.roydon.dear.agent.orchestrator.SimpleOrchestrator;
+import com.roydon.dear.agent.registry.AgentRegistry;
+import com.roydon.dear.common.AgentResponse;
+import com.roydon.dear.common.manager.AgentTaskManager;
+import com.roydon.dear.common.prompts.ReactAgentPrompts;
+import com.roydon.dear.knowledge.rag.retriever.KnowledgeRetrievalService;
+import com.roydon.dear.model.registry.ModelRegistry;
+import com.roydon.dear.model.tts.AgentVoiceStreamService;
+import com.roydon.dear.prompt.service.AiPromptService;
+import com.roydon.dear.session.service.ChatConversationService;
+import com.roydon.dear.session.service.ChatMessageService;
+import com.roydon.dear.session.service.IAiChatFileService;
+import com.roydon.dear.tool.McpToolManager;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.tool.ToolCallback;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Flux;
 
-    if (StringUtils.isNotBlank(conversationId)) {
-        ChatMemory chatMemory = orchestrator.createPersistentChatMemory(conversationId, 30);
-        orchestrator.setChatMemory(chatMemory);
+import java.util.Map;
+
+@Slf4j
+@RestController
+@RequestMapping("/multi-agent")
+public class MultiAgentController {
+
+    @Autowired
+    private ModelRegistry modelRegistry;
+    @Autowired
+    private ChatConversationService conversationService;
+    @Autowired
+    private ChatMessageService messageService;
+    @Autowired
+    private AiPromptService aiPromptService;
+    @Autowired
+    private AgentTaskManager taskManager;
+    @Autowired
+    private AgentVoiceStreamService agentVoiceStreamService;
+    @Autowired
+    private McpToolManager mcpToolManager;
+    @Autowired
+    private IAiChatFileService aiChatFileService;
+    @Autowired
+    private KnowledgeRetrievalService knowledgeRetrievalService;
+    @Autowired
+    private AgentRegistry agentRegistry;
+
+    /**
+     * 多 Agent 协同流式接口
+     *
+     * @param query          用户查询内容
+     * @param conversationId 会话ID
+     * @param mode           协作模式：auto(LLM自动调度) | research(深度研究PlanExecute)
+     * @param think          是否启用深度思考
+     * @param fileIds        关联文件ID列表
+     */
+    @GetMapping(value = "/collaborate/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<String> collaborateStream(@RequestParam String query,
+                                          @RequestParam String conversationId,
+                                          @RequestParam(defaultValue = "auto") String mode,
+                                          @RequestParam(required = false) Boolean think,
+                                          @RequestParam(required = false) String fileIds) {
+        log.info("多Agent协同请求: query={}, conversationId={}, mode={}", query, conversationId, mode);
+
+        try {
+            SimpleOrchestrator orchestrator = buildOrchestrator(conversationId, fileIds);
+            return orchestrator.stream(conversationId, query, Boolean.TRUE.equals(think), fileIds, null, null);
+        } catch (Exception e) {
+            log.error("多Agent协同异常", e);
+            return Flux.just(
+                    AgentResponse.error("多Agent协同异常：" + e.getMessage()),
+                    AgentResponse.done("error"));
+        }
     }
-    return orchestrator;
+
+    /**
+     * 停止多 Agent 协同执行
+     */
+    @GetMapping("/stop")
+    public Map<String, Object> stopCollaborate(@RequestParam String conversationId) {
+        log.info("停止多Agent协同: conversationId={}", conversationId);
+        boolean success = taskManager.stopTask(conversationId);
+        return Map.of("code", 200, "success", success,
+                "message", success ? "已停止执行" : "没有找到正在执行的任务");
+    }
+
+    // ===== 编排器构建（与 AgentController.initDearAgent 平行，互不影响） =====
+
+    private SimpleOrchestrator buildOrchestrator(String conversationId, String fileIds) {
+        // 系统提示词加载逻辑与 AgentController 一致
+        String systemPrompt = loadSystemPrompt(conversationId, fileIds);
+        ToolCallback[] tools = mcpToolManager.getAllTools();
+        ChatModel chatModel = modelRegistry.getDefaultChatModel("chat");
+        SkillRegistry skillRegistry = FileSystemSkillRegistry.builder()
+                .userSkillsDirectory(System.getProperty("user.home") + "/.dear-agent/.skills")
+                .build();
+        SpringAiSkillAdvisor skillAdvisor = SpringAiSkillAdvisor.builder()
+                .skillRegistry(skillRegistry)
+                .build();
+
+        SimpleOrchestrator orchestrator = SimpleOrchestrator.builder()
+                .name("multi-agent-orchestrator")
+                .chatModel(chatModel)
+                .tools(tools)
+                .advisors(skillAdvisor)
+                .systemPrompt(enhanceSystemPromptForMultiAgent(systemPrompt))
+                .conversationService(conversationService)
+                .messageService(messageService)
+                .taskManager(taskManager)
+                .knowledgeRetrievalService(knowledgeRetrievalService)
+                .maxRounds(50)
+                .agentRegistry(agentRegistry)
+                .build();
+
+        if (StringUtils.isNotBlank(conversationId)) {
+            ChatMemory chatMemory = orchestrator.createPersistentChatMemory(conversationId, 30);
+            orchestrator.setChatMemory(chatMemory);
+        }
+        return orchestrator;
+    }
+
+    /**
+     * 在多 Agent 场景下增强系统提示词，告知 LLM 可调度的 Agent 信息。
+     */
+    private String enhanceSystemPromptForMultiAgent(String basePrompt) {
+        StringBuilder sb = new StringBuilder(basePrompt);
+        sb.append("\n\n## 可调度的专业 Agent\n");
+        sb.append("你可以调用以下专业 Agent 来协作完成任务：\n");
+        for (String name : agentRegistry.getAgentNames()) {
+            var meta = agentRegistry.getMetadata(name);
+            sb.append("- **").append(name).append("**: ").append(meta.description()).append("\n");
+        }
+        sb.append("\n根据任务复杂度自主决定是否调度 Agent。简单任务可直接回答。\n");
+        return sb.toString();
+    }
+
+    // loadSystemPrompt 复用与 AgentController 相同的逻辑
 }
 ```
+
+**与 AgentController 的职责划分：**
+
+| Controller | 路径前缀 | 构建的 Agent | 适用场景 |
+|------------|---------|-------------|----------|
+| `AgentController` | `/agent` | `DearAgent` | 简单对话、日常问答、单轮工具调用 |
+| `MultiAgentController` | `/multi-agent` | `SimpleOrchestrator` | 复杂任务、需多 Agent 协作、深度研究 |
+
+两个 Controller 互不依赖、平行存在，`AgentController` 原有逻辑一行不改。
 
 ### 3.8 Agent 自动注册
 
@@ -430,10 +586,10 @@ public class AgentAutoConfiguration {
 
 | 项目 | 改动 |
 |------|------|
-| 新增文件 | `AgentMetadata`, `AgentRegistry`, `AgentToolAdapter`, `SimpleOrchestrator`, `AgentAutoConfiguration` |
-| 修改文件 | `WebSearchReactAgent` 实现 `AgentMetadata`，`AgentController.initAgent()` 路由逻辑 |
-| 不动文件 | `DearAgent`, `BaseAgent`, `ReactAgent`, `AgentTaskManager`, 全部 Tool 类 |
-| 前端影响 | 无。SSE type 新增 `agent_call`，旧 type 不变 |
+| 新增文件 | `AgentMetadata`, `AgentRegistry`, `AgentToolAdapter`, `SimpleOrchestrator`, `AgentAutoConfiguration`, `MultiAgentController` |
+| 修改文件 | `WebSearchReactAgent` 实现 `AgentMetadata` |
+| 不动文件 | `AgentController`, `DearAgent`, `BaseAgent`, `ReactAgent`, `AgentTaskManager`, 全部 Tool 类 |
+| 前端影响 | 无。多 Agent 走新路径 `/multi-agent/collaborate/stream`，单 Agent 走旧路径 `/agent/chat/stream` 不变 |
 
 ---
 
@@ -704,9 +860,9 @@ public class ResearchPipeline {
 | 项目 | 改动 |
 |------|------|
 | 新增文件 | `PlanExecuteOrchestrator`, `AgentOrchestrator` 接口及实现, `SearchTask`, `ResearchPipeline` |
-| 修改文件 | `AgentRegistry` 增加 `getAgentByRole()` |
-| 不动文件 | 所有已有 Agent、Tool、Controller |
-| 前端影响 | 无。SSE type 不变 |
+| 修改文件 | `AgentRegistry` 增加 `getAgentByRole()`；`MultiAgentController` 增加 `mode=research` 路由到 `PlanExecuteOrchestrator` |
+| 不动文件 | `AgentController` 及所有已有 Agent、Tool |
+| 前端影响 | 新增 `plan`、`critique` SSE type，旧 type 不变 |
 
 ---
 
@@ -1022,28 +1178,64 @@ data: {"type":"done","content":"conversationId"}
 
 ### 7.3 新增 API 端点
 
+全部多 Agent 接口集中在 `MultiAgentController`（路径前缀 `/multi-agent`），`AgentController`（路径前缀 `/agent`）保持不变。
+
 ```java
-// AgentController.java 新增
+// MultiAgentController.java
 
 /**
- * 多 Agent 协同流式接口（Phase 2+）
+ * 多 Agent 协同流式接口（Phase 1 起可用）
+ *
+ * mode 参数：
+ *   auto          — LLM 自主决策是否调度 Sub-Agent（默认，Phase 1）
+ *   plan_execute  — 强制走 Plan-Execute-Critique 深度研究流程（Phase 2）
+ *   supervisor    — Supervisor-Worker 完全自主模式（Phase 3）
  */
-@GetMapping("/agent/collaborate/stream")
+@GetMapping("/multi-agent/collaborate/stream")
 public Flux<String> collaborateStream(
         @RequestParam String query,
         @RequestParam String conversationId,
-        @RequestParam(defaultValue = "auto") String mode) {
-    // mode: auto(LLM自动选择) | research(深度研究) | plan_execute(强制PlanExecute)
-}
+        @RequestParam(defaultValue = "auto") String mode,
+        @RequestParam(required = false) Boolean think,
+        @RequestParam(required = false) String fileIds);
 
 /**
- * 获取当前会话的 Agent 调用链（Phase 2+）
- * 前端用于展示"思考过程"面板
+ * 停止多 Agent 协同执行
  */
-@GetMapping("/agent/trace/{conversationId}")
-public Map<String, Object> getAgentTrace(@PathVariable String conversationId) {
-    // 返回调用树结构
-}
+@GetMapping("/multi-agent/stop")
+public Map<String, Object> stopCollaborate(@RequestParam String conversationId);
+
+/**
+ * 获取当前会话的 Agent 调用链追踪（Phase 2+）
+ * 前端用于展示多 Agent "思考过程"面板
+ */
+@GetMapping("/multi-agent/trace/{conversationId}")
+public Map<String, Object> getAgentTrace(@PathVariable String conversationId);
+
+/**
+ * 编程式编排：链式执行（Phase 2+）
+ * POST body 指定 Agent 执行顺序
+ */
+@PostMapping("/multi-agent/chain/stream")
+public Flux<String> chainStream(@RequestBody ChainRequest request);
+```
+
+### 7.4 API 端点全景
+
+```
+单 Agent 对话（保留不变）:
+  GET  /agent/chat/stream          ← AgentController → DearAgent
+  GET  /agent/stop                 ← AgentController
+
+多 Agent 协同（新增）:
+  GET  /multi-agent/collaborate/stream  ← MultiAgentController → SimpleOrchestrator
+  GET  /multi-agent/stop                ← MultiAgentController
+  GET  /multi-agent/trace/{id}          ← MultiAgentController (Phase 2+)
+  POST /multi-agent/chain/stream        ← MultiAgentController (Phase 2+)
+
+语音（保留）:
+  GET  /api/agent/stream-with-voice
+  GET  /api/agent/quick
 ```
 
 ---
@@ -1078,10 +1270,12 @@ public Map<String, Object> getAgentTrace(@PathVariable String conversationId) {
 
 | 保证措施 |
 |----------|
-| `AgentController.chatStream()` 默认使用 SimpleOrchestrator，行为与当前 DearAgent 一致 |
-| DearAgent 代码不修改，仅通过继承扩展 |
-| 新增类型全部为可选字段，旧前端忽略未知 type 不报错 |
-| AgentRegistry 为空时（未注册任何 Sub-Agent），编排器退化为普通 DearAgent |
+| `AgentController` **零改动** — 原 `/agent/chat/stream` 路径、`DearAgent` 构建逻辑、SSE 输出格式全部保留不变 |
+| 多 Agent 功能全部收敛在 `MultiAgentController` 和新增类中，与现有代码物理隔离 |
+| `SimpleOrchestrator` 继承 `DearAgent`，不修改 DearAgent 源码 |
+| 新增 SSE type 为可选扩展，旧前端忽略未知 type 不报错 |
+| AgentRegistry 为空时（未注册任何 Sub-Agent），编排器退化为普通 DearAgent 行为 |
+| 两个 Controller 可独立部署 — 即使 `MultiAgentController` 出问题，`/agent/chat/stream` 不受影响 |
 
 ---
 
@@ -1095,10 +1289,11 @@ public Map<String, Object> getAgentTrace(@PathVariable String conversationId) {
 - [ ] `SimpleOrchestrator` 编排器
 - [ ] `WebSearchReactAgent` 实现 `AgentMetadata`
 - [ ] `AgentAutoConfiguration` 自动注册
-- [ ] `AgentController` 切换到编排器构建
+- [ ] `MultiAgentController` 实现 + 路由逻辑
+- [ ] `AgentController` 零改动验证（回归测试通过）
 - [ ] 单元测试：Agent 注册/查找/适配
 - [ ] 集成测试：编排器 + 搜索 Agent 协作
-- [ ] 前端验证：SSE 流无异常
+- [ ] 前端验证：`/agent/chat/stream` 和 `/multi-agent/collaborate/stream` 两条路径均正常
 
 ### Phase 2
 
