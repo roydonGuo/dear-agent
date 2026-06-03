@@ -63,6 +63,7 @@ public class SessionController {
                 AiPrompt prompt = promptService.getById(conversation.getPromptId());
                 if (prompt != null) {
                     resolveAvatarUrl(prompt);
+                    detailVO.setAvatar(prompt.getAvatar());
                     detailVO.setSystemPrompt(prompt.getPrompt());
                 }
             }
@@ -188,6 +189,7 @@ public class SessionController {
                 AiPrompt prompt = promptService.getById(conversation.getPromptId());
                 if (prompt != null) {
                     resolveAvatarUrl(prompt);
+                    vo.setAvatar(prompt.getAvatar());
                     vo.setSystemPrompt(prompt.getPrompt());
                 }
             }

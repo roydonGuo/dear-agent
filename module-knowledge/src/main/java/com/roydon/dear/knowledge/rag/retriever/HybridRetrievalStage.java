@@ -33,7 +33,7 @@ public class HybridRetrievalStage implements RagStage {
         SearchRequest.Builder searchBuilder = SearchRequest.builder()
                 .query(ctx.getQuery())
                 .topK(ctx.getTopK())
-                .similarityThreshold(0.3);
+                .similarityThreshold(0.7);
 
         if (StringUtils.hasText(ctx.getFilterExpression())) {
             searchBuilder.filterExpression(ctx.getFilterExpression());
