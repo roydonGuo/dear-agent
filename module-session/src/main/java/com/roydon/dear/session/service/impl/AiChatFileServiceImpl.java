@@ -23,7 +23,7 @@ import java.util.concurrent.TimeUnit;
  */
 @Service
 public class AiChatFileServiceImpl extends ServiceImpl<AiChatFileMapper, AiChatFile> implements IAiChatFileService {
-    public static final String CACHE_NAME = "chatFile:";
+    public static final String CACHE_NAME = ":chatFile:";
     public static final String CACHE_NAME_LIST = "list_by_ids:";
 
     @Resource

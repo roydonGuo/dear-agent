@@ -56,6 +56,7 @@ public class DearAgent extends BaseAgent {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private String currentKnowledge;
+    protected volatile Sinks.Many<String> currentSink;
 
     public DearAgent(String name, ChatModel chatModel, List<ToolCallback> tools, String systemPrompt, int maxRounds,
                      ChatMemory chatMemory, List<Advisor> advisors, int maxReflectionRounds,
@@ -124,6 +125,7 @@ public class DearAgent extends BaseAgent {
         List<Message> messages = Collections.synchronizedList(new ArrayList<>());
         boolean useMemory = conversationId != null && chatMemory != null;
         if (StringUtils.isBlank(conversationId)) conversationId = UUID.randomUUID().toString();
+        this.currentConversationId = conversationId;
 
         Flux<String> checkResult = checkRunningTask(conversationId);
         if (checkResult != null) return checkResult;
@@ -132,6 +134,7 @@ public class DearAgent extends BaseAgent {
         clearUsedTools();
 
         Sinks.Many<String> sink = Sinks.many().unicast().onBackpressureBuffer();
+        this.currentSink = sink;
 
         AgentTaskManager.TaskInfo taskInfo = registerTask(conversationId, sink);
         if (taskInfo == null && conversationId != null && taskManager != null) {
@@ -231,7 +234,7 @@ public class DearAgent extends BaseAgent {
             String toolsStr = toolCallMessages.isEmpty() ? getUsedToolsString() : JSON.toJSONString(toolCallMessages);
             String referenceJson = "";
             if (!agentState.searchResults.isEmpty())
-                referenceJson = createReferenceResponse(JSON.toJSONString(agentState.searchResults));
+                referenceJson = createReferenceResponse(truncateReferenceJson(JSON.toJSONString(agentState.searchResults)));
             messageService.saveAssistantMessage(
                     currentConversationNumericId,
                     currentUserMessageId,
@@ -513,7 +516,7 @@ public class DearAgent extends BaseAgent {
     /**
      * 根据工具类型发射对应 type 的 SSE 消息
      */
-    private String emitToolStatus(String toolType, String content) {
+    protected String emitToolStatus(String toolType, String content) {
         return switch (toolType) {
             case "mcp" -> createMcpResponse(content);
             case "skill" -> createSkillResponse(content);
@@ -652,6 +655,30 @@ public class DearAgent extends BaseAgent {
 
     public void setMaxRounds(int maxRounds) {
         this.maxRounds = maxRounds;
+    }
+
+    /**
+     * 截断 reference JSON 中各结果的 content 字段，防止超出数据库列限制。
+     */
+    private String truncateReferenceJson(String referenceJson) {
+        if (referenceJson == null || referenceJson.length() <= 500) {
+            return referenceJson;
+        }
+        try {
+            var results = JSON.parseArray(referenceJson);
+            if (results != null) {
+                for (int i = 0; i < results.size(); i++) {
+                    JSONObject item = results.getJSONObject(i);
+                    String content = item.getString("content");
+                    if (content != null && content.length() > 500) {
+                        item.put("content", content.substring(0, 500) + "...");
+                    }
+                }
+                return JSON.toJSONString(results);
+            }
+        } catch (Exception ignored) {
+        }
+        return referenceJson;
     }
 
     public static Builder builder() {

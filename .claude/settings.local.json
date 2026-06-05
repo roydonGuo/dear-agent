@@ -85,7 +85,16 @@
       "Bash(cmd //c \"where mvn\")",
       "Bash(cmd //c \"dir /s /b D:\\\\apache-maven* 2>nul & dir /s /b C:\\\\Users\\\\31330\\\\.m2\\\\wrapper 2>nul & where java 2>nul\")",
       "Bash(\"/c/Users/31330/.m2/wrapper/dists/apache-maven-3.9.11-bin/6mqf5t809d9geo83kj4ttckcbc/apache-maven-3.9.11/bin/mvn\" -f \"D:/JetBrains/JavaProjects/dear-agent\" compile -DskipTests)",
-      "Bash(\"/c/Users/31330/.m2/wrapper/dists/apache-maven-3.9.11-bin/6mqf5t809d9geo83kj4ttckcbc/apache-maven-3.9.11/bin/mvn\" -f \"D:/JetBrains/JavaProjects/dear-agent\" dependency:resolve -pl module-knowledge -DskipTests -q)"
+      "Bash(\"/c/Users/31330/.m2/wrapper/dists/apache-maven-3.9.11-bin/6mqf5t809d9geo83kj4ttckcbc/apache-maven-3.9.11/bin/mvn\" -f \"D:/JetBrains/JavaProjects/dear-agent\" dependency:resolve -pl module-knowledge -DskipTests -q)",
+      "Bash(which mvn *)",
+      "Bash(find /d/Jetbrains -path \"*/plugins/maven*/**/mvn*\" 2>/dev/null | head -5; find /d/Jetbrains -path \"*/plugins/maven*\" -type d -maxdepth 5 2>/dev/null | head -5)",
+      "Bash(cp D:/Jetbrains/IdeaProjects/aiflowy/.mvn/wrapper/maven-wrapper.jar D:/Jetbrains/IdeaProjects/dear-agent/.mvn/wrapper/)",
+      "Bash(cp D:/Jetbrains/IdeaProjects/aiflowy/.mvn/wrapper/MavenWrapperDownloader.java D:/Jetbrains/IdeaProjects/dear-agent/.mvn/wrapper/)",
+      "Bash(cp D:/Jetbrains/IdeaProjects/aiflowy/mvnw D:/Jetbrains/IdeaProjects/dear-agent/)",
+      "Bash(cp D:/Jetbrains/IdeaProjects/aiflowy/mvnw.cmd D:/Jetbrains/IdeaProjects/dear-agent/)",
+      "Bash(bash mvnw clean compile -rf :module-agent)",
+      "Bash(bash mvnw clean compile)",
+      "Bash(bash mvnw compile -pl module-agent)"
     ]
   },
   "enabledPlugins": {

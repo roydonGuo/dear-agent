@@ -16,6 +16,16 @@ public class AgentResponse {
     public static final String TYPE_EXPRESSION = "expression";
     public static final String TYPE_DONE = "done";
     public static final String TYPE_AUDIO = "audio";
+    /** 多 Agent 协同相关 */
+    public static final String TYPE_AGENT_START = "agent_start";
+    public static final String TYPE_AGENT_DONE = "agent_done";
+    public static final String TYPE_AGENT_ERROR = "agent_error";
+    public static final String TYPE_AGENT_CALL = "agent_call";
+    /** Plan-Execute 相关 */
+    public static final String TYPE_PLAN = "plan";
+    public static final String TYPE_PLAN_STEP_START = "plan_step_start";
+    public static final String TYPE_PLAN_STEP_DONE = "plan_step_done";
+    public static final String TYPE_PLAN_STEP_ERROR = "plan_step_error";
     /**
      * 工具相关
      */
@@ -106,6 +116,38 @@ public class AgentResponse {
 
     public static String done(String content) {
         return new AgentResponse(TYPE_DONE, content).toJson();
+    }
+
+    public static String agentStart(String content) {
+        return new AgentResponse(TYPE_AGENT_START, content).toJson();
+    }
+
+    public static String agentDone(String content) {
+        return new AgentResponse(TYPE_AGENT_DONE, content).toJson();
+    }
+
+    public static String agentError(String content) {
+        return new AgentResponse(TYPE_AGENT_ERROR, content).toJson();
+    }
+
+    public static String agentCall(String content) {
+        return new AgentResponse(TYPE_AGENT_CALL, content).toJson();
+    }
+
+    public static String plan(String content) {
+        return new AgentResponse(TYPE_PLAN, content).toJson();
+    }
+
+    public static String planStepStart(String content) {
+        return new AgentResponse(TYPE_PLAN_STEP_START, content).toJson();
+    }
+
+    public static String planStepDone(String content) {
+        return new AgentResponse(TYPE_PLAN_STEP_DONE, content).toJson();
+    }
+
+    public static String planStepError(String content) {
+        return new AgentResponse(TYPE_PLAN_STEP_ERROR, content).toJson();
     }
 
     public static String json(String type, Object content) {

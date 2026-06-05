@@ -4,6 +4,9 @@ import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.roydon.dear.agent.orchestrator.SubAgentContext;
+import com.roydon.dear.agent.registry.AgentMetadata;
+import com.roydon.dear.common.AgentResponse;
 import com.roydon.dear.common.domain.agent.AgentState;
 import com.roydon.dear.common.domain.agent.RoundMode;
 import com.roydon.dear.common.domain.agent.RoundState;
@@ -37,7 +40,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 @Slf4j
-public class WebSearchReactAgent extends BaseAgent {
+public class WebSearchReactAgent extends BaseAgent implements AgentMetadata {
 
     private ChatClient chatClient;
     private final List<ToolCallback> tools;
@@ -409,6 +412,282 @@ public class WebSearchReactAgent extends BaseAgent {
 
     public void setMaxRounds(int maxRounds) {
         this.maxRounds = maxRounds;
+    }
+
+    // ===== AgentMetadata 接口实现 =====
+
+    @Override
+    public String agentName() {
+        return "web_search_agent";
+    }
+
+    @Override
+    public String description() {
+        return "联网搜索专家，擅长搜索最新信息、验证事实、查找资料。";
+    }
+
+    @Override
+    public String role() {
+        return "search";
+    }
+
+    @Override
+    public String callSync(String input) {
+        SubAgentContext ctx = SubAgentContext.get();
+        if (ctx != null) {
+            return callAsSubAgent(input, ctx);
+        }
+        // 非编排模式：原有逻辑
+        StringBuilder sb = new StringBuilder();
+        execute(UUID.randomUUID().toString(), input)
+                .doOnNext(chunk -> {
+                    try {
+                        JSONObject json = JSON.parseObject(chunk);
+                        if ("text".equals(json.getString("type"))) {
+                            sb.append(json.getString("content"));
+                        }
+                    } catch (Exception ignored) {
+                    }
+                })
+                .doOnError(err -> sb.append("[搜索出错: ").append(err.getMessage()).append("]"))
+                .blockLast();
+        return sb.toString();
+    }
+
+    /**
+     * 作为子 Agent 执行：流式输出通过父 sink 推送，结果保存到父会话。
+     * agent_start/agent_done 由编排器负责发射，此处只做文本流式输出。
+     */
+    private String callAsSubAgent(String task, SubAgentContext ctx) {
+        Sinks.Many<String> sink = ctx.getSink();
+
+        List<Message> messages = Collections.synchronizedList(new ArrayList<>());
+        messages.add(new SystemMessage(ReactAgentPrompts.getWebSearchPrompt()));
+        if (StringUtils.isNotBlank(systemPrompt)) messages.add(new SystemMessage(systemPrompt));
+        messages.add(new UserMessage("<question>" + task + "</question>"));
+
+        StringBuilder finalAnswer = new StringBuilder();
+        StringBuilder thinkingBuffer = new StringBuilder();
+        AgentState agentState = new AgentState();
+        AtomicLong roundCounter = new AtomicLong(0);
+        AtomicBoolean hasSentFinalResult = new AtomicBoolean(false);
+        Sinks.Many<String> subSink = Sinks.many().unicast().onBackpressureBuffer();
+
+        // 走 round-based 流式执行（不注册 task，不保存 user message）
+        scheduleRoundForSubAgent(messages, subSink, roundCounter, hasSentFinalResult, agentState, thinkingBuffer);
+
+        subSink.asFlux()
+                .doOnNext(chunk -> {
+                    // 转发到父 sink
+                    sink.tryEmitNext(chunk);
+                    try {
+                        JSONObject json = JSON.parseObject(chunk);
+                        String type = json.getString("type");
+                        if ("text".equals(type)) {
+                            finalAnswer.append(json.getString("content"));
+                        } else if ("thinking".equals(type)) {
+                            thinkingBuffer.append(json.getString("content"));
+                        }
+                    } catch (Exception ignored) {
+                    }
+                })
+                .doFinally(sig -> {
+                    // 保存子 Agent 回答到父会话
+                    saveSubAgentResult(ctx, finalAnswer.toString(), thinkingBuffer.toString(), agentState);
+                })
+                .blockLast();
+
+        return finalAnswer.toString();
+    }
+
+    /**
+     * 子 Agent 专用的 round 调度（跳过任务注册和用户消息保存）
+     */
+    private void scheduleRoundForSubAgent(List<Message> messages, Sinks.Many<String> subSink,
+                                          AtomicLong roundCounter, AtomicBoolean hasSentFinalResult,
+                                          AgentState agentState, StringBuilder thinkingBuffer) {
+        roundCounter.incrementAndGet();
+        RoundState state = new RoundState();
+
+        Disposable disposable = chatClient.prompt().messages(messages).stream().chatResponse()
+                .publishOn(Schedulers.boundedElastic())
+                .doOnNext(chunk -> processChunk(chunk, subSink, state))
+                .doOnComplete(() -> finishRoundForSubAgent(messages, subSink, state, roundCounter,
+                        hasSentFinalResult, agentState, thinkingBuffer))
+                .doOnError(err -> {
+                    if (!hasSentFinalResult.get()) {
+                        hasSentFinalResult.set(true);
+                        subSink.tryEmitError(err);
+                    }
+                })
+                .subscribe();
+    }
+
+    private void finishRoundForSubAgent(List<Message> messages, Sinks.Many<String> subSink, RoundState state,
+                                        AtomicLong roundCounter, AtomicBoolean hasSentFinalResult,
+                                        AgentState agentState, StringBuilder thinkingBuffer) {
+        if (state.getMode() != RoundMode.TOOL_CALL) {
+            String finalText = state.textBuffer.toString();
+            if (!agentState.searchResults.isEmpty()) {
+                subSink.tryEmitNext(createReferenceResponse(JSON.toJSONString(agentState.searchResults)));
+            }
+            subSink.tryEmitComplete();
+            hasSentFinalResult.set(true);
+            return;
+        }
+
+        AssistantMessage assistantMsg = AssistantMessage.builder().toolCalls(state.toolCalls).build();
+        messages.add(assistantMsg);
+
+        if (maxRounds > 0 && roundCounter.get() >= maxRounds) {
+            forceFinalStreamForSubAgent(messages, subSink, hasSentFinalResult, agentState);
+            return;
+        }
+
+        executeToolCallsForSubAgent(subSink, state.toolCalls, messages, hasSentFinalResult, agentState, () -> {
+            if (!hasSentFinalResult.get()) {
+                scheduleRoundForSubAgent(messages, subSink, roundCounter, hasSentFinalResult,
+                        agentState, thinkingBuffer);
+            }
+        });
+    }
+
+    private void forceFinalStreamForSubAgent(List<Message> messages, Sinks.Many<String> subSink,
+                                             AtomicBoolean hasSentFinalResult, AgentState agentState) {
+        List<Message> newMessages = new ArrayList<>();
+        newMessages.add(new SystemMessage(ReactAgentPrompts.getWebSearchPrompt()));
+        if (StringUtils.isNotBlank(systemPrompt)) newMessages.add(new SystemMessage(systemPrompt));
+        for (Message msg : messages) {
+            if (!(msg instanceof SystemMessage)) newMessages.add(msg);
+        }
+        newMessages.add(new UserMessage("你已达到最大推理轮次限制。请基于当前已有的上下文信息，直接给出最终答案。禁止再调用任何工具。"));
+        messages.clear();
+        messages.addAll(newMessages);
+
+        StringBuilder finalTextBuffer = new StringBuilder();
+        chatClient.prompt().messages(messages).stream().chatResponse()
+                .publishOn(Schedulers.boundedElastic())
+                .doOnNext(chunk -> {
+                    if (chunk == null || chunk.getResult() == null || chunk.getResult().getOutput() == null) return;
+                    String text = chunk.getResult().getOutput().getText();
+                    if (text != null && !hasSentFinalResult.get()) {
+                        subSink.tryEmitNext(createTextResponse(text));
+                        finalTextBuffer.append(text);
+                    }
+                })
+                .doOnComplete(() -> {
+                    if (!agentState.searchResults.isEmpty()) {
+                        subSink.tryEmitNext(createReferenceResponse(JSON.toJSONString(agentState.searchResults)));
+                    }
+                    hasSentFinalResult.set(true);
+                    subSink.tryEmitComplete();
+                })
+                .doOnError(err -> {
+                    hasSentFinalResult.set(true);
+                    subSink.tryEmitError(err);
+                })
+                .subscribe();
+    }
+
+    private void executeToolCallsForSubAgent(Sinks.Many<String> subSink,
+                                             List<AssistantMessage.ToolCall> toolCalls,
+                                             List<Message> messages,
+                                             AtomicBoolean hasSentFinalResult,
+                                             AgentState agentState,
+                                             Runnable onComplete) {
+        AtomicInteger completedCount = new AtomicInteger(0);
+        int totalToolCalls = toolCalls.size();
+        Map<String, ToolResponseMessage.ToolResponse> responseMap = new ConcurrentHashMap<>();
+
+        for (AssistantMessage.ToolCall tc : toolCalls) {
+            Schedulers.boundedElastic().schedule(() -> {
+                if (hasSentFinalResult.get()) {
+                    completeToolCall(completedCount, totalToolCalls, responseMap, toolCalls, messages, onComplete);
+                    return;
+                }
+                String toolName = tc.name();
+                String argsJson = tc.arguments();
+                ToolCallback callback = findTool(toolName);
+                if (callback == null) {
+                    responseMap.put(tc.id(), new ToolResponseMessage.ToolResponse(tc.id(), toolName,
+                            "{ \"error\": \"工具未找到：" + toolName + "\" }"));
+                    completeToolCall(completedCount, totalToolCalls, responseMap, toolCalls, messages, onComplete);
+                    return;
+                }
+                if (toolName.contains("search")) {
+                    JSONObject args = JSON.parseObject(argsJson);
+                    String query = (String) args.get("query");
+                    String queryThink = StringUtils.isNotBlank(query)
+                            ? "🔍 正在搜索信息: " + query + "\n"
+                            : "🔍 正在搜索相关信息\n";
+                    subSink.tryEmitNext(createThinkingResponse(queryThink));
+                }
+                try {
+                    Object result = callback.call(argsJson);
+                    String resultStr = result.toString();
+                    recordUsedTool(toolName);
+                    if (toolName.contains("tavily")) parseSearchResult(resultStr, agentState);
+                    responseMap.put(tc.id(), new ToolResponseMessage.ToolResponse(tc.id(), toolName, resultStr));
+                } catch (Exception ex) {
+                    responseMap.put(tc.id(), new ToolResponseMessage.ToolResponse(tc.id(), toolName,
+                            "{ \"error\": \"工具执行失败：" + ex.getMessage() + "\" }"));
+                } finally {
+                    completeToolCall(completedCount, totalToolCalls, responseMap, toolCalls, messages, onComplete);
+                }
+            });
+        }
+    }
+
+    /**
+     * 将子 Agent 的执行结果保存到父会话。
+     */
+    private void saveSubAgentResult(SubAgentContext ctx, String answer, String thinking, AgentState agentState) {
+        try {
+            if (ctx.getConversationService() != null && ctx.getMessageService() != null
+                    && ctx.getParentConversationNumericId() != null && ctx.getParentUserMessageId() != null
+                    && !answer.isEmpty()) {
+                String referenceJson = "";
+                if (!agentState.searchResults.isEmpty()) {
+                    referenceJson = createReferenceResponse(
+                            truncateReferenceJson(JSON.toJSONString(agentState.searchResults)));
+                }
+                ctx.getMessageService().saveAssistantMessage(
+                        ctx.getParentConversationNumericId(),
+                        ctx.getParentUserMessageId(),
+                        answer, thinking,
+                        getUsedToolsString(),
+                        referenceJson,
+                        null, null,
+                        null, null,
+                        ctx.getFileIds());
+            }
+        } catch (Exception e) {
+            log.warn("保存子 Agent 结果失败: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * 截断 reference JSON，防止超出数据库列限制。
+     */
+    private String truncateReferenceJson(String referenceJson) {
+        if (referenceJson == null || referenceJson.length() <= 500) {
+            return referenceJson;
+        }
+        try {
+            var results = JSON.parseArray(referenceJson);
+            if (results != null) {
+                for (int i = 0; i < results.size(); i++) {
+                    JSONObject item = results.getJSONObject(i);
+                    String content = item.getString("content");
+                    if (content != null && content.length() > 500) {
+                        item.put("content", content.substring(0, 500) + "...");
+                    }
+                }
+                return JSON.toJSONString(results);
+            }
+        } catch (Exception ignored) {
+        }
+        return referenceJson;
     }
 
     public static Builder builder() {
