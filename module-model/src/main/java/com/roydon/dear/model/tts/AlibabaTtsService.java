@@ -41,6 +41,9 @@ public class AlibabaTtsService {
         input.put("text", text);
         input.put("voice", voice != null ? voice : ttsConfig.getVoice());
         input.put("language_type", ttsConfig.getLanguageType());
+        input.put("speed", ttsConfig.getSpeed());
+        input.put("pitch", ttsConfig.getPitch());
+        input.put("emotion", ttsConfig.getEmotion());
         requestBody.put("input", input);
 
         return webClient.post()
@@ -109,6 +112,9 @@ public class AlibabaTtsService {
         input.put("text", text);
         input.put("voice", voice != null ? voice : ttsConfig.getVoice());
         input.put("language_type", ttsConfig.getLanguageType());
+        input.put("speed", ttsConfig.getSpeed());
+        input.put("pitch", ttsConfig.getPitch());
+        input.put("emotion", ttsConfig.getEmotion());
         requestBody.put("input", input);
 
         return webClient.post()
