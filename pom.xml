@@ -26,6 +26,7 @@
         <module>module-agent</module>
         <module>module-skill</module>
         <module>module-web</module>
+        <module>module-event</module>
         <module>module-knowledge</module>
         <module>module-starter</module>
         <module>module-prompt</module>
@@ -134,6 +135,11 @@
             <dependency>
                 <groupId>com.roydon.dear</groupId>
                 <artifactId>module-knowledge</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.roydon.dear</groupId>
+                <artifactId>module-event</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

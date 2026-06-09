@@ -6,6 +6,10 @@ import com.roydon.dear.agent.BaseAgent;
 import com.roydon.dear.agent.registry.AgentRegistry;
 import com.roydon.dear.common.AgentResponse;
 import com.roydon.dear.common.manager.AgentTaskManager;
+import com.roydon.dear.event.events.PlanCreatedEvent;
+import com.roydon.dear.event.events.PlanStepStartEvent;
+import com.roydon.dear.event.events.PlanStepEndEvent;
+import com.roydon.dear.event.events.PlanStepErrorEvent;
 import com.roydon.dear.common.prompts.PlanExecutePrompts;
 import com.roydon.dear.session.entity.ChatConversation;
 import com.roydon.dear.session.entity.ChatMessage;
@@ -110,8 +114,8 @@ public class PlanExecuteAgent extends BaseAgent {
                 runPlanExecuteLoop(conversationId, question, sink);
             } catch (Exception e) {
                 log.error("PlanExecuteAgent 执行异常", e);
-                sink.tryEmitNext(createErrorResponse("PlanExecuteAgent 执行异常：" + e.getMessage()));
-                sink.tryEmitNext(createDoneResponse(conversationId));
+                sink.tryEmitNext(AgentResponse.error("PlanExecuteAgent 执行异常：" + e.getMessage()));
+                sink.tryEmitNext(AgentResponse.done(conversationId));
                 sink.tryEmitComplete();
             }
         });
@@ -131,8 +135,8 @@ public class PlanExecuteAgent extends BaseAgent {
         // Phase 1: 生成计划
         List<PlanStep> plan = generatePlan(question, sink);
         if (plan.isEmpty()) {
-            sink.tryEmitNext(createErrorResponse("无法为当前问题生成执行计划"));
-            sink.tryEmitNext(createDoneResponse(conversationId));
+            sink.tryEmitNext(AgentResponse.error("无法为当前问题生成执行计划"));
+            sink.tryEmitNext(AgentResponse.done(conversationId));
             sink.tryEmitComplete();
             return;
         }
@@ -192,6 +196,12 @@ public class PlanExecuteAgent extends BaseAgent {
             // 发射 plan SSE 事件
             String planJson = JSON.toJSONString(plan);
             sink.tryEmitNext(AgentResponse.plan(planJson));
+            if (eventBus != null) {
+                List<PlanCreatedEvent.PlanStep> steps = plan.stream()
+                        .map(ps -> new PlanCreatedEvent.PlanStep(ps.getId(), ps.getTitle(), ps.getInstruction(), ps.getOrder()))
+                        .toList();
+                eventBus.publish(new PlanCreatedEvent(steps));
+            }
             log.info("计划生成完成: {} 个步骤", plan.size());
             return plan;
         } catch (Exception e) {
@@ -298,7 +308,8 @@ public class PlanExecuteAgent extends BaseAgent {
 
             // 如果 LLM 返回了文本内容，流式输出
             if (StringUtils.isNotBlank(aiText)) {
-                sink.tryEmitNext(createTextResponse(aiText));
+                sink.tryEmitNext(AgentResponse.text(aiText));
+                if (eventBus != null) publishTextDelta(aiText);
                 textAccumulator.append(aiText);
             }
 
@@ -321,7 +332,10 @@ public class PlanExecuteAgent extends BaseAgent {
                 toolMsg.put("tool", toolName);
                 toolMsg.put("status", "start");
                 toolMsg.put("args", argsJson);
-                sink.tryEmitNext(createToolResponse(toolMsg.toJSONString()));
+                sink.tryEmitNext(AgentResponse.function(toolMsg.toJSONString()));
+                if (eventBus != null) {
+                    publishToolStart(tc.id(), toolName, parseArgsMap(argsJson));
+                }
 
                 // 如果是 Agent 工具 → 设置 SubAgentContext
                 boolean isAgentTool = agentRegistry != null && agentRegistry.getAgentNames().contains(toolName);
@@ -342,9 +356,12 @@ public class PlanExecuteAgent extends BaseAgent {
                     JSONObject doneMsg = new JSONObject();
                     doneMsg.put("tool", toolName);
                     doneMsg.put("status", "done");
-                    doneMsg.put("result",
-                            resultStr.length() > 300 ? resultStr.substring(0, 300) + "..." : resultStr);
-                    sink.tryEmitNext(createToolResponse(doneMsg.toJSONString()));
+                    String truncated = resultStr.length() > 300 ? resultStr.substring(0, 300) + "..." : resultStr;
+                    doneMsg.put("result", truncated);
+                    sink.tryEmitNext(AgentResponse.function(doneMsg.toJSONString()));
+                    if (eventBus != null) {
+                        publishToolEnd(tc.id(), toolName, truncated);
+                    }
                 } catch (Exception e) {
                     responses.add(new ToolResponseMessage.ToolResponse(tc.id(), toolName,
                             "{ \"error\": \"" + e.getMessage() + "\" }"));
@@ -387,7 +404,8 @@ public class PlanExecuteAgent extends BaseAgent {
                         if (chunk.getResult() != null && chunk.getResult().getOutput() != null) {
                             String text = chunk.getResult().getOutput().getText();
                             if (text != null) {
-                                sink.tryEmitNext(createTextResponse(text));
+                                sink.tryEmitNext(AgentResponse.text(text));
+                                if (eventBus != null) publishTextDelta(text);
                                 finalAnswer.append(text);
                             }
                         }
@@ -395,20 +413,20 @@ public class PlanExecuteAgent extends BaseAgent {
                     .doOnComplete(() -> {
                         // 保存最终结果
                         saveFinalResult(conversationId, finalAnswer.toString());
-                        sink.tryEmitNext(createDoneResponse(conversationId));
+                        sink.tryEmitNext(AgentResponse.done(conversationId));
                         sink.tryEmitComplete();
                     })
                     .doOnError(err -> {
                         log.error("总结阶段异常", err);
-                        sink.tryEmitNext(createErrorResponse("总结异常：" + err.getMessage()));
-                        sink.tryEmitNext(createDoneResponse(conversationId));
+                        sink.tryEmitNext(AgentResponse.error("总结异常：" + err.getMessage()));
+                        sink.tryEmitNext(AgentResponse.done(conversationId));
                         sink.tryEmitComplete();
                     })
                     .blockLast();
         } catch (Exception e) {
             log.error("总结阶段异常", e);
-            sink.tryEmitNext(createErrorResponse("总结异常：" + e.getMessage()));
-            sink.tryEmitNext(createDoneResponse(conversationId));
+            sink.tryEmitNext(AgentResponse.error("总结异常：" + e.getMessage()));
+            sink.tryEmitNext(AgentResponse.done(conversationId));
             sink.tryEmitComplete();
         }
     }
@@ -422,14 +440,21 @@ public class PlanExecuteAgent extends BaseAgent {
         msg.put("instruction", step.getInstruction());
         msg.put("order", step.getOrder());
         sink.tryEmitNext(AgentResponse.planStepStart(msg.toJSONString()));
+        if (eventBus != null) {
+            eventBus.publish(new PlanStepStartEvent(step.getId(), step.getTitle(), step.getInstruction(), step.getOrder()));
+        }
     }
 
     private void emitStepDone(PlanStep step, String result, Sinks.Many<String> sink) {
+        String truncated = result.length() > 500 ? result.substring(0, 500) + "..." : result;
         JSONObject msg = new JSONObject();
         msg.put("stepId", step.getId());
         msg.put("title", step.getTitle());
-        msg.put("result", result.length() > 500 ? result.substring(0, 500) + "..." : result);
+        msg.put("result", truncated);
         sink.tryEmitNext(AgentResponse.planStepDone(msg.toJSONString()));
+        if (eventBus != null) {
+            eventBus.publish(new PlanStepEndEvent(step.getId(), step.getTitle(), truncated));
+        }
     }
 
     private void emitStepError(PlanStep step, String error, Sinks.Many<String> sink) {
@@ -438,6 +463,9 @@ public class PlanExecuteAgent extends BaseAgent {
         msg.put("title", step.getTitle());
         msg.put("error", error);
         sink.tryEmitNext(AgentResponse.planStepError(msg.toJSONString()));
+        if (eventBus != null) {
+            eventBus.publish(new PlanStepErrorEvent(step.getId(), step.getTitle(), error));
+        }
     }
 
     private void setupSubAgentContext(Sinks.Many<String> sink) {
@@ -450,6 +478,15 @@ public class PlanExecuteAgent extends BaseAgent {
                 messageService,
                 null);
         SubAgentContext.set(ctx);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> parseArgsMap(String argsJson) {
+        try {
+            return JSON.parseObject(argsJson, Map.class);
+        } catch (Exception e) {
+            return Map.of("raw", argsJson);
+        }
     }
 
     private ToolCallback findTool(String name) {
@@ -486,6 +523,7 @@ public class PlanExecuteAgent extends BaseAgent {
         private ChatConversationService conversationService;
         private ChatMessageService messageService;
         private AgentTaskManager taskManager;
+        private com.roydon.dear.event.AgentEventBus eventBus;
 
         public Builder name(String name) { this.name = name; return this; }
         public Builder chatModel(ChatModel chatModel) { this.chatModel = chatModel; return this; }
@@ -496,11 +534,14 @@ public class PlanExecuteAgent extends BaseAgent {
         public Builder conversationService(ChatConversationService s) { this.conversationService = s; return this; }
         public Builder messageService(ChatMessageService s) { this.messageService = s; return this; }
         public Builder taskManager(AgentTaskManager s) { this.taskManager = s; return this; }
+        public Builder eventBus(com.roydon.dear.event.AgentEventBus bus) { this.eventBus = bus; return this; }
 
         public PlanExecuteAgent build() {
             if (chatModel == null) throw new IllegalArgumentException("chatModel 不能为空！");
-            return new PlanExecuteAgent(name, chatModel, tools, agentRegistry, maxPlanSteps,
+            PlanExecuteAgent agent = new PlanExecuteAgent(name, chatModel, tools, agentRegistry, maxPlanSteps,
                     conversationService, messageService, taskManager);
+            if (eventBus != null) agent.setEventBus(eventBus);
+            return agent;
         }
     }
 }

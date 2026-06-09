@@ -6,11 +6,14 @@ import com.alibaba.cloud.ai.graph.skills.registry.filesystem.FileSystemSkillRegi
 import com.roydon.dear.agent.DearAgent;
 import com.roydon.dear.common.AgentResponse;
 import com.roydon.dear.common.manager.AgentTaskManager;
-import com.roydon.dear.knowledge.rag.retriever.KnowledgeRetrievalService;
 import com.roydon.dear.common.prompts.ReactAgentPrompts;
+import com.roydon.dear.event.AgentEventBus;
+import com.roydon.dear.event.DefaultAgentEventBus;
+import com.roydon.dear.event.SessionEventPersister;
+import com.roydon.dear.event.SseEventEmitter;
+import com.roydon.dear.knowledge.rag.retriever.KnowledgeRetrievalService;
 import com.roydon.dear.model.registry.ModelRegistry;
 import com.roydon.dear.model.tts.AgentVoiceStreamService;
-import com.roydon.dear.web.common.BusinessMetrics;
 import com.roydon.dear.prompt.entity.AiPrompt;
 import com.roydon.dear.prompt.service.AiPromptService;
 import com.roydon.dear.session.entity.AiChatFile;
@@ -20,6 +23,7 @@ import com.roydon.dear.session.service.ChatConversationService;
 import com.roydon.dear.session.service.ChatMessageService;
 import com.roydon.dear.session.service.IAiChatFileService;
 import com.roydon.dear.tool.McpToolManager;
+import com.roydon.dear.web.common.BusinessMetrics;
 import io.micrometer.core.annotation.Timed;
 import io.swagger.v3.oas.annotations.Operation;
 import lombok.extern.slf4j.Slf4j;
@@ -76,7 +80,6 @@ public class AgentController {
      * 接收用户查询请求，根据配置参数执行智能问答，并返回Server-Sent Events(SSE)格式的流式响应。
      * 支持深度思考、联网搜索、语音输出等功能。
      * </p>
-     * 无法控制 think ：<a href="https://github.com/spring-projects/spring-ai/issues/4879">...</a>
      *
      * @param query            用户查询内容，不能为空
      * @param conversationId   会话ID，用于标识和追踪对话上下文
@@ -111,31 +114,41 @@ public class AgentController {
 
         businessMetrics.recordChatRequest();
 
-        // 验证查询参数有效性
         if (query == null || query.trim().isEmpty()) {
             log.warn("参数为空或无效");
             return Flux.error(new IllegalArgumentException("参数不能为空"));
         }
 
         try {
-            // 初始化Agent实例并执行流式问答
-            DearAgent dearAgent = initDearAgent(conversationId, webSearchEnabled, fileIds);
-            Flux<String> agentStream = dearAgent.stream(conversationId, query, thinkEnabled, fileIds, useKnowledgeBase, knowledgeBaseIds);
+            // 创建本次请求的事件总线和 SSE 发射器
+            AgentEventBus eventBus = new DefaultAgentEventBus();
+            SseEventEmitter sseEmitter = new SseEventEmitter(eventBus);
 
-            // 根据配置决定是否添加语音输出功能
+            DearAgent dearAgent = initDearAgent(conversationId, webSearchEnabled, fileIds, eventBus);
+            Flux<String> agentStream = dearAgent.stream(conversationId, query, thinkEnabled, fileIds,
+                    useKnowledgeBase, knowledgeBaseIds, sseEmitter);
+
+            // 订阅 agent 内部 Flux 以触发 doFinally（保存 + 清理），SSE 输出由 sseEmitter 提供
+            agentStream.subscribe(
+                    null,
+                    error -> log.error("Agent stream error: {}", error.getMessage()),
+                    () -> log.debug("Agent stream completed")
+            );
+
+            // 使用事件总线的 SSE 流
+            Flux<String> sseFlux = sseEmitter.toSseFlux();
+
             if (voiceEnabled) {
-                return agentVoiceStreamService.withVoice(agentStream, voice);
+                return agentVoiceStreamService.withVoice(sseFlux, voice);
             }
-            return agentStream;
+            return sseFlux;
         } catch (IllegalStateException e) {
-            // 处理模型配置异常
             log.warn("模型配置异常: {}", e.getMessage());
             businessMetrics.recordChatError();
             return Flux.just(
                     AgentResponse.error("模型未配置：" + e.getMessage()),
                     AgentResponse.done("error"));
         } catch (Exception e) {
-            // 处理其他未预期异常
             log.error("处理请求时发生错误: ", e);
             businessMetrics.recordChatError();
             return Flux.just(
@@ -164,10 +177,16 @@ public class AgentController {
     }
 
     private DearAgent initDearAgent(String conversationId, boolean webSearchEnabled, String fileIds) {
-        log.debug("开始初始化DearAgent: conversationId={}, webSearchEnabled={}", conversationId, webSearchEnabled);
+        return initDearAgent(conversationId, webSearchEnabled, fileIds, null);
+    }
+
+    private DearAgent initDearAgent(String conversationId, boolean webSearchEnabled, String fileIds,
+                                    AgentEventBus eventBus) {
+        log.debug("开始初始化DearAgent: conversationId={}, webSearchEnabled={}, useEventBus={}",
+                conversationId, webSearchEnabled, eventBus != null);
         String systemPrompt;
         ToolCallback[] tools;
-        // 填充系统提示词
+
         if (StringUtils.isNotBlank(conversationId)) {
             ChatConversation chatConversation = conversationService.getBySessionId(conversationId);
             Long promptId = chatConversation.getPromptId();
@@ -180,7 +199,7 @@ public class AgentController {
         } else {
             systemPrompt = ReactAgentPrompts.cozeSysPrompt();
         }
-        // 给系统提示词拼接文件信息
+
         if (StringUtils.isNotBlank(fileIds)) {
             List<AiChatFile> chatFileList = aiChatFileService.getListByIds(fileIds);
             AtomicReference<String> prompt = new AtomicReference<>("""
@@ -193,12 +212,12 @@ public class AgentController {
                         ## 文件大小：%s
                         ## 文件类型：%s
                         ## 文件创建时间：%s
-                        """.formatted(chatFile.getFileName(), chatFile.getExtractedText(), chatFile.getFileSize(), chatFile.getFileType(), chatFile.getCreatedTime()));
+                        """.formatted(chatFile.getFileName(), chatFile.getExtractedText(), chatFile.getFileSize(),
+                        chatFile.getFileType(), chatFile.getCreatedTime()));
             });
             systemPrompt = systemPrompt + prompt.get();
         }
 
-        // 给系统提示词拼接时间
         systemPrompt = systemPrompt + ReactAgentPrompts.getJoinSysPrompt();
         tools = mcpToolManager.getAllTools();
 
@@ -208,35 +227,29 @@ public class AgentController {
                 .userSkillsDirectory(System.getProperty("user.home") + "/.dear-agent/.skills")
                 .build();
 
-        /*
-          3. 创建 SpringAiSkillAdvisor，把 SkillRegistry 注入进去
-             Advisor 会在每次对话的 before() 阶段将 Skill 列表追加到 System Prompt
-         */
         SpringAiSkillAdvisor skillAdvisor = SpringAiSkillAdvisor.builder()
                 .skillRegistry(skillRegistry)
                 .build();
 
-        // todo 根据不同类型切换不同agent
-
         DearAgent dearReact = DearAgent.builder()
                 .name("dear react")
                 .chatModel(chatModel)
-                .tools(tools) // function call / mcp / read_skill
-                .advisors(skillAdvisor) // skill advisors
+                .tools(tools)
+                .advisors(skillAdvisor)
                 .systemPrompt(systemPrompt)
                 .conversationService(conversationService)
                 .messageService(messageService)
                 .taskManager(taskManager)
                 .knowledgeRetrievalService(knowledgeRetrievalService)
+                .eventBus(eventBus)
                 .maxRounds(50)
                 .build();
         log.debug("初始化DearReact完成");
+
         if (StringUtils.isNotBlank(conversationId)) {
             ChatMemory chatMemory = dearReact.createPersistentChatMemory(conversationId, 30);
             dearReact.setChatMemory(chatMemory);
         }
         return dearReact;
     }
-
-
 }

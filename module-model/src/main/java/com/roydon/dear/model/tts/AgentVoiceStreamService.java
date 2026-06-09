@@ -78,6 +78,8 @@ public class AgentVoiceStreamService {
         state.next(event);
         if ("text".equals(type)) {
             appendTextAndStartTts(json.getString("content"), state);
+        } else if ("text_delta".equals(type)) {
+            appendTextAndStartTts(json.getString("text"), state);
         }
     }
 

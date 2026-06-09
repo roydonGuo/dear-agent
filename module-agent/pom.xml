@@ -16,6 +16,10 @@
     <dependencies>
         <dependency>
             <groupId>com.roydon.dear</groupId>
+            <artifactId>module-event</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.roydon.dear</groupId>
             <artifactId>module-common</artifactId>
         </dependency>
         <dependency>

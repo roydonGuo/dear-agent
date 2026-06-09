@@ -6,6 +6,7 @@ import com.roydon.dear.common.BaseResult;
 import com.roydon.dear.core.service.FileStorage;
 import com.roydon.dear.prompt.entity.AiPrompt;
 import com.roydon.dear.prompt.service.AiPromptService;
+import com.alibaba.fastjson2.JSON;
 import com.roydon.dear.session.entity.AiChatFile;
 import com.roydon.dear.session.entity.ChatConversation;
 import com.roydon.dear.session.entity.ChatMessage;
@@ -163,6 +164,14 @@ public class SessionController {
                 result.add(current);
             } else if ("assistant".equals(msg.getMessageType())) {
                 if (current != null) {
+                    // 优先使用新协议 eventStream，回退旧协议字段
+                    if (StringUtils.isNotBlank(msg.getEventStream())) {
+                        try {
+                            current.setEventStream(JSON.parse(msg.getEventStream()));
+                        } catch (Exception e) {
+                            log.warn("解析 eventStream 失败: msgId={}", msg.getId(), e);
+                        }
+                    }
                     current.setAnswer(msg.getContent());
                     current.setThinking(msg.getThinking());
                     current.setTools(msg.getTools());

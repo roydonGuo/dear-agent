@@ -4,12 +4,18 @@ import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.roydon.dear.common.AgentResponse;
 import com.roydon.dear.common.domain.agent.AgentState;
 import com.roydon.dear.common.domain.agent.RoundMode;
 import com.roydon.dear.common.domain.agent.RoundState;
 import com.roydon.dear.common.domain.agent.SearchResult;
 import com.roydon.dear.common.manager.AgentTaskManager;
 import com.roydon.dear.common.prompts.ReactAgentPrompts;
+import com.roydon.dear.event.AgentEventBus;
+import com.roydon.dear.event.SseEventEmitter;
+import com.roydon.dear.event.events.KnowledgeEndEvent;
+import com.roydon.dear.event.events.RecommendEvent;
+import com.roydon.dear.event.events.ReferenceEvent;
 import com.roydon.dear.knowledge.rag.retriever.KnowledgeRetrievalService;
 import com.roydon.dear.session.entity.ChatConversation;
 import com.roydon.dear.session.entity.ChatMessage;
@@ -30,7 +36,6 @@ import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StopWatch;
-import org.springframework.web.bind.annotation.RequestParam;
 import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
@@ -56,7 +61,6 @@ public class DearAgent extends BaseAgent {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private String currentKnowledge;
-    protected volatile Sinks.Many<String> currentSink;
 
     public DearAgent(String name, ChatModel chatModel, List<ToolCallback> tools, String systemPrompt, int maxRounds,
                      ChatMemory chatMemory, List<Advisor> advisors, int maxReflectionRounds,
@@ -96,30 +100,38 @@ public class DearAgent extends BaseAgent {
 
     @Override
     public Flux<String> execute(String conversationId, String question) {
-        return streamInternal(conversationId, question, true, null, null, null);
+        return streamInternal(conversationId, question, true, null, null, null, null);
     }
 
     public Flux<String> stream(String question) {
-        return streamInternal(null, question, true, null, null, null);
+        return streamInternal(null, question, true, null, null, null, null);
     }
 
     public Flux<String> stream(String conversationId, String question) {
-        return streamInternal(conversationId, question, true, null, null, null);
+        return streamInternal(conversationId, question, true, null, null, null, null);
     }
 
     public Flux<String> stream(String conversationId, String question, boolean enableThinking) {
-        return streamInternal(conversationId, question, enableThinking, null, null, null);
+        return streamInternal(conversationId, question, enableThinking, null, null, null, null);
     }
 
     public Flux<String> stream(String conversationId, String question, boolean enableThinking, String fileIds) {
-        return streamInternal(conversationId, question, enableThinking, fileIds, null, null);
+        return streamInternal(conversationId, question, enableThinking, fileIds, null, null, null);
     }
 
-    public Flux<String> stream(String conversationId, String question, boolean enableThinking, String fileIds, Boolean useKnowledgeBase, String knowledgeBaseIds) {
-        return streamInternal(conversationId, question, enableThinking, fileIds, useKnowledgeBase, knowledgeBaseIds);
+    public Flux<String> stream(String conversationId, String question, boolean enableThinking, String fileIds,
+                               Boolean useKnowledgeBase, String knowledgeBaseIds) {
+        return streamInternal(conversationId, question, enableThinking, fileIds, useKnowledgeBase, knowledgeBaseIds, null);
     }
 
-    private Flux<String> streamInternal(String conversationId, String question, boolean enableThinking, String fileIds, Boolean useKnowledgeBase, String knowledgeBaseIds) {
+    public Flux<String> stream(String conversationId, String question, boolean enableThinking, String fileIds,
+                               Boolean useKnowledgeBase, String knowledgeBaseIds,
+                               SseEventEmitter sseEmitter) {
+        return streamInternal(conversationId, question, enableThinking, fileIds, useKnowledgeBase, knowledgeBaseIds, sseEmitter);
+    }
+
+    private Flux<String> streamInternal(String conversationId, String question, boolean enableThinking, String fileIds,
+                                        Boolean useKnowledgeBase, String knowledgeBaseIds, SseEventEmitter sseEmitter) {
         StopWatch streamInternal = new StopWatch("streamInternal");
         streamInternal.start();
         List<Message> messages = Collections.synchronizedList(new ArrayList<>());
@@ -133,8 +145,16 @@ public class DearAgent extends BaseAgent {
         initTimers();
         clearUsedTools();
 
+        // Always create sink for task manager lifecycle (cancellation signals)
+        // Event bus handles content emission when available
+        boolean useEventBus = eventBus != null;
         Sinks.Many<String> sink = Sinks.many().unicast().onBackpressureBuffer();
-        this.currentSink = sink;
+
+        // 事件总线模式：收集所有事件用于 event_stream 持久化
+        List<com.roydon.dear.event.AgentEvent> eventCollector = useEventBus ? new ArrayList<>() : null;
+        if (useEventBus) {
+            eventBus.onAll(eventCollector::add);
+        }
 
         AgentTaskManager.TaskInfo taskInfo = registerTask(conversationId, sink);
         if (taskInfo == null && conversationId != null && taskManager != null) {
@@ -155,7 +175,6 @@ public class DearAgent extends BaseAgent {
             List<org.springframework.ai.document.Document> knowledgeDocs =
                     knowledgeRetrievalService.retrieve(question, kbIds, 5);
             if (!knowledgeDocs.isEmpty()) {
-                // SSE 推送（不含 content 文本，避免数据量过大）
                 String knowledgeJson = JSON.toJSONString(knowledgeDocs.stream().map(doc -> {
                     JSONObject item = new JSONObject();
                     item.put("score", doc.getScore());
@@ -163,8 +182,16 @@ public class DearAgent extends BaseAgent {
                     return item;
                 }).toList());
                 currentKnowledge = knowledgeJson;
-                sink.tryEmitNext(createKnowledgeResponse(knowledgeJson, knowledgeDocs.size()));
-                // 注入 LLM 上下文（含完整内容）
+                List<KnowledgeEndEvent.KnowledgeItem> items = knowledgeDocs.stream()
+                        .map(doc -> new KnowledgeEndEvent.KnowledgeItem(
+                                doc.getScore() != null ? doc.getScore() : 0.0,
+                                doc.getMetadata()))
+                        .toList();
+                if (useEventBus) {
+                    publishKnowledgeEnd(items, knowledgeDocs.size());
+                } else {
+                    sink.tryEmitNext(AgentResponse.knowledge(knowledgeJson, knowledgeDocs.size()));
+                }
                 String knowledgeCtx = knowledgeRetrievalService.formatAsContext(knowledgeDocs);
                 messages.add(new SystemMessage(knowledgeCtx));
             }
@@ -191,24 +218,39 @@ public class DearAgent extends BaseAgent {
         AgentState agentState = new AgentState();
         List<JSONObject> toolCallMessages = Collections.synchronizedList(new ArrayList<>());
 
+        long thinkingStartTime = enableThinking ? System.currentTimeMillis() : 0;
+        boolean[] thinkingStarted = {false};
+
         streamInternal.stop();
         log.info("streamInternal-before: {}ms", streamInternal.getTotalTimeMillis());
-        // streamInternal-before: 788ms
         streamInternal.start();
-        // 轮询
-        scheduleRound(messages, sink, roundCounter, hasSentFinalResult, finalAnswerBuffer, useMemory, conversationId, agentState, thinkingBuffer, enableThinking, toolCallMessages);
+
+        scheduleRound(messages, sink, roundCounter, hasSentFinalResult, finalAnswerBuffer, useMemory, conversationId,
+                agentState, thinkingBuffer, enableThinking, toolCallMessages, useEventBus,
+                thinkingStartTime, thinkingStarted);
 
         streamInternal.stop();
         log.info("streamInternal-after: {}ms", streamInternal.getTotalTimeMillis());
-        // streamInternal-after: 789ms
-        String finalConversationId = conversationId;
-        return sink.asFlux()
+
+        Flux<String> resultFlux;
+        if (useEventBus && sseEmitter != null) {
+            resultFlux = sseEmitter.toSseFlux();
+        } else if (sink != null) {
+            resultFlux = sink.asFlux();
+        } else {
+            return Flux.error(new IllegalStateException("无可用的事件输出通道"));
+        }
+
+        final String finalConversationId = conversationId;
+        return resultFlux
                 .doOnNext(chunk -> {
                     recordFirstResponse();
                     try {
                         JSONObject json = JSON.parseObject(chunk);
                         String type = json.getString("type");
-                        if ("text".equals(type)) finalAnswerBuffer.append(json.getString("content"));
+                        if ("text_delta".equals(type) || "text".equals(type)) {
+                            finalAnswerBuffer.append(json.getString(type.equals("text_delta") ? "text" : "content"));
+                        }
                     } catch (Exception e) {
                         finalAnswerBuffer.append(chunk);
                     }
@@ -220,21 +262,45 @@ public class DearAgent extends BaseAgent {
                 .doFinally(signalType -> {
                     log.info("最终答案: {}", finalAnswerBuffer);
                     log.info("思考过程: {}", thinkingBuffer);
-                    saveSessionResult(finalConversationId, finalAnswerBuffer, thinkingBuffer, agentState, toolCallMessages, fileIds);
+                    if (useEventBus && eventCollector != null) {
+                        saveEventStreamResult(finalConversationId, eventCollector);
+                    } else {
+                        saveSessionResult(finalConversationId, finalAnswerBuffer, thinkingBuffer, agentState, toolCallMessages, fileIds);
+                    }
                     if (taskManager != null) taskManager.stopTask(finalConversationId);
-                    // todo 发送 done 消息
-//                    sink.tryEmitNext(createDoneResponse(finalConversationId1));
                 });
     }
 
-    private void saveSessionResult(String conversationId, StringBuilder finalAnswerBuffer, StringBuilder thinkingBuffer, AgentState agentState, List<JSONObject> toolCallMessages, String fileIds) {
+    private void saveEventStreamResult(String conversationId, List<com.roydon.dear.event.AgentEvent> events) {
+        if (conversationService != null && messageService != null && currentConversationNumericId != null
+                && currentUserMessageId != null && events != null && !events.isEmpty()) {
+            try {
+                String eventStreamJson = MAPPER.writeValueAsString(events);
+                messageService.saveAssistantMessage(currentConversationNumericId, currentUserMessageId, eventStreamJson);
+                String lastMsg = events.stream()
+                        .filter(e -> e instanceof com.roydon.dear.event.events.TextDeltaEvent)
+                        .map(e -> ((com.roydon.dear.event.events.TextDeltaEvent) e).getText())
+                        .reduce("", String::concat);
+                if (lastMsg.length() > 64) lastMsg = lastMsg.substring(0, 64);
+                if (!lastMsg.isEmpty()) {
+                    conversationService.updateLastMessage(currentConversationNumericId, lastMsg);
+                }
+                log.info("event_stream 已保存到会话: sessionId={}, eventCount={}", conversationId, events.size());
+            } catch (Exception e) {
+                log.error("保存 event_stream 失败: conversationId={}", conversationId, e);
+            }
+        }
+    }
+
+    private void saveSessionResult(String conversationId, StringBuilder finalAnswerBuffer, StringBuilder thinkingBuffer,
+                                   AgentState agentState, List<JSONObject> toolCallMessages, String fileIds) {
         if (conversationService != null && messageService != null && currentConversationNumericId != null
                 && currentUserMessageId != null && finalAnswerBuffer.length() > 0) {
             long totalResponseTime = getTotalResponseTime();
             String toolsStr = toolCallMessages.isEmpty() ? getUsedToolsString() : JSON.toJSONString(toolCallMessages);
             String referenceJson = "";
             if (!agentState.searchResults.isEmpty())
-                referenceJson = createReferenceResponse(truncateReferenceJson(JSON.toJSONString(agentState.searchResults)));
+                referenceJson = JSON.toJSONString(agentState.searchResults);
             messageService.saveAssistantMessage(
                     currentConversationNumericId,
                     currentUserMessageId,
@@ -254,9 +320,11 @@ public class DearAgent extends BaseAgent {
         }
     }
 
-    private void scheduleRound(List<Message> messages, Sinks.Many<String> sink, AtomicLong roundCounter, AtomicBoolean hasSentFinalResult,
-                               StringBuilder finalAnswerBuffer, boolean useMemory, String conversationId, AgentState agentState,
-                               StringBuilder thinkingBuffer, boolean enableThinking, List<JSONObject> toolCallMessages) {
+    private void scheduleRound(List<Message> messages, Sinks.Many<String> sink, AtomicLong roundCounter,
+                               AtomicBoolean hasSentFinalResult, StringBuilder finalAnswerBuffer, boolean useMemory,
+                               String conversationId, AgentState agentState, StringBuilder thinkingBuffer,
+                               boolean enableThinking, List<JSONObject> toolCallMessages,
+                               boolean useEventBus, long thinkingStartTime, boolean[] thinkingStarted) {
         roundCounter.incrementAndGet();
         RoundState state = new RoundState();
 
@@ -266,12 +334,19 @@ public class DearAgent extends BaseAgent {
                 .stream()
                 .chatResponse()
                 .publishOn(Schedulers.boundedElastic())
-                .doOnNext(chunk -> processChunk(chunk, sink, state, thinkingBuffer, enableThinking))
-                .doOnComplete(() -> finishRound(messages, sink, state, roundCounter, hasSentFinalResult, finalAnswerBuffer, useMemory, conversationId, agentState, thinkingBuffer, enableThinking, toolCallMessages))
+                .doOnNext(chunk -> processChunk(chunk, sink, state, thinkingBuffer, enableThinking, useEventBus,
+                        thinkingStartTime, thinkingStarted))
+                .doOnComplete(() -> finishRound(messages, sink, state, roundCounter, hasSentFinalResult,
+                        finalAnswerBuffer, useMemory, conversationId, agentState, thinkingBuffer, enableThinking,
+                        toolCallMessages, useEventBus, thinkingStartTime, thinkingStarted))
                 .doOnError(err -> {
                     if (!hasSentFinalResult.get()) {
                         hasSentFinalResult.set(true);
-                        sink.tryEmitError(err);
+                        if (useEventBus) {
+                            publishError(conversationId, err.getMessage(), "AGENT_ERROR");
+                        } else if (sink != null) {
+                            sink.tryEmitError(err);
+                        }
                     }
                 })
                 .subscribe();
@@ -280,30 +355,51 @@ public class DearAgent extends BaseAgent {
     }
 
     /**
-     * 处理ChatResponse
+     * 处理流式 chunk，遵循 OpenAI 格式：每个 chunk 只能是一种类型
+     * 优先级：tool_calls > reasoning_content > content
      */
-    private void processChunk(ChatResponse chunk, Sinks.Many<String> sink, RoundState state, StringBuilder thinkingBuffer, boolean enableThinking) {
+    private void processChunk(ChatResponse chunk, Sinks.Many<String> sink, RoundState state,
+                              StringBuilder thinkingBuffer, boolean enableThinking, boolean useEventBus,
+                              long thinkingStartTime, boolean[] thinkingStarted) {
         if (chunk == null || chunk.getResult() == null || chunk.getResult().getOutput() == null) return;
         Generation gen = chunk.getResult();
         String text = gen.getOutput().getText();
         List<AssistantMessage.ToolCall> tc = gen.getOutput().getToolCalls();
 
-        if (text == null || text.isEmpty()) {
-            String thinkingText = extractThinkingText(gen);
-            if (StringUtils.isNotBlank(thinkingText)) {
-                thinkingBuffer.append(thinkingText);
-                sink.tryEmitNext(createThinkingResponse(thinkingText));
-            }
-        }
-
+        // 1. tool_calls — 独占，不回退
         if (tc != null && !tc.isEmpty()) {
             state.mode = RoundMode.TOOL_CALL;
             for (AssistantMessage.ToolCall incoming : tc) mergeToolCall(state, incoming);
             return;
         }
 
-        if (text != null) {
-            sink.tryEmitNext(createTextResponse(text));
+        // 2. reasoning_content (thinking) — 独占
+        String thinkingText = extractThinkingText(gen);
+        if (StringUtils.isNotBlank(thinkingText)) {
+            thinkingBuffer.append(thinkingText);
+            if (useEventBus) {
+                if (!thinkingStarted[0]) {
+                    thinkingStarted[0] = true;
+                    publishThinkingStart();
+                }
+                publishThinkingText(thinkingText);
+            } else if (sink != null) {
+                sink.tryEmitNext(AgentResponse.thinking(thinkingText));
+            }
+            return;
+        }
+
+        // 3. content (text) — 独占
+        if (StringUtils.isNotBlank(text)) {
+            if (useEventBus) {
+                if (thinkingStarted[0]) {
+                    thinkingStarted[0] = false;
+                    publishThinkingEnd(System.currentTimeMillis() - thinkingStartTime);
+                }
+                publishTextDelta(text);
+            } else if (sink != null) {
+                sink.tryEmitNext(AgentResponse.text(text));
+            }
             state.textBuffer.append(text);
         }
     }
@@ -320,34 +416,63 @@ public class DearAgent extends BaseAgent {
         state.toolCalls.add(incoming);
     }
 
-    /**
-     * 轮结束
-     */
     private void finishRound(List<Message> messages, Sinks.Many<String> sink, RoundState state,
                              AtomicLong roundCounter, AtomicBoolean hasSentFinalResult, StringBuilder finalAnswerBuffer,
                              boolean useMemory, String conversationId, AgentState agentState,
-                             StringBuilder thinkingBuffer, boolean enableThinking, List<JSONObject> toolCallMessages) {
+                             StringBuilder thinkingBuffer, boolean enableThinking, List<JSONObject> toolCallMessages,
+                             boolean useEventBus, long thinkingStartTime, boolean[] thinkingStarted) {
         if (state.getMode() != RoundMode.TOOL_CALL) {
             log.debug("结束轮次: round={}, mode={}, text={}", roundCounter.get(), state.getMode(), state.textBuffer.toString());
-            String referenceJson = "";
             String finalText = state.textBuffer.toString();
 
+            // End thinking if still active
+            if (thinkingStarted[0]) {
+                thinkingStarted[0] = false;
+                if (useEventBus) {
+                    publishThinkingEnd(System.currentTimeMillis() - thinkingStartTime);
+                }
+            }
+
             if (!agentState.searchResults.isEmpty()) {
-                String reference = JSON.toJSONString(agentState.searchResults);
-                referenceJson = createReferenceResponse(reference);
-                sink.tryEmitNext(referenceJson);
+                List<ReferenceEvent.SearchResultItem> items = agentState.searchResults.stream()
+                        .map(sr -> new ReferenceEvent.SearchResultItem(sr.url(), sr.title(), sr.content()))
+                        .toList();
+                if (useEventBus) {
+                    eventBus.publish(new ReferenceEvent(items));
+                } else if (sink != null) {
+                    sink.tryEmitNext(AgentResponse.reference(JSON.toJSONString(agentState.searchResults)));
+                }
             }
 
             if (enableRecommendations) {
                 String recommendations = generateRecommendations(conversationId, currentQuestion, finalText);
                 if (recommendations != null) {
                     currentRecommendations = recommendations;
-                    sink.tryEmitNext(createRecommendResponse(recommendations));
+                    try {
+                        List<String> questions = JSON.parseArray(recommendations, String.class);
+                        if (questions != null && !questions.isEmpty()) {
+                            if (useEventBus) {
+                                eventBus.publish(new RecommendEvent(questions));
+                            } else if (sink != null) {
+                                sink.tryEmitNext(AgentResponse.recommend(recommendations, questions.size()));
+                            }
+                        }
+                    } catch (Exception e) {
+                        if (!useEventBus && sink != null) {
+                            sink.tryEmitNext(AgentResponse.recommend(recommendations));
+                        }
+                    }
                 }
             }
 
-            sink.tryEmitNext(createDoneResponse(conversationId));
-            sink.tryEmitComplete();
+            List<String> toolNames = usedTools != null ? new ArrayList<>(usedTools) : List.of();
+            if (useEventBus) {
+                publishDone(conversationId, getTotalResponseTime(), (int) roundCounter.get(), toolNames);
+                eventBus.complete();
+            } else if (sink != null) {
+                sink.tryEmitNext(AgentResponse.done(conversationId));
+                sink.tryEmitComplete();
+            }
             hasSentFinalResult.set(true);
             return;
         }
@@ -356,21 +481,25 @@ public class DearAgent extends BaseAgent {
         messages.add(assistantMsg);
 
         if (maxRounds > 0 && roundCounter.get() >= maxRounds) {
-            forceFinalStream(messages, sink, hasSentFinalResult, state, conversationId, useMemory, agentState, thinkingBuffer, enableThinking);
+            forceFinalStream(messages, sink, hasSentFinalResult, state, conversationId, useMemory, agentState,
+                    thinkingBuffer, enableThinking, useEventBus, thinkingStartTime, thinkingStarted);
             return;
         }
 
-        /// 执行工具调用
-        executeToolCalls(sink, state.toolCalls, messages, hasSentFinalResult, state, agentState, thinkingBuffer, enableThinking, toolCallMessages, () -> {
-            if (!hasSentFinalResult.get()) {
-                scheduleRound(messages, sink, roundCounter, hasSentFinalResult, finalAnswerBuffer, useMemory, conversationId, agentState, thinkingBuffer, enableThinking, toolCallMessages);
-            }
-        });
+        executeToolCalls(sink, state.toolCalls, messages, hasSentFinalResult, state, agentState,
+                thinkingBuffer, enableThinking, toolCallMessages, useEventBus, () -> {
+                    if (!hasSentFinalResult.get()) {
+                        scheduleRound(messages, sink, roundCounter, hasSentFinalResult, finalAnswerBuffer,
+                                useMemory, conversationId, agentState, thinkingBuffer, enableThinking,
+                                toolCallMessages, useEventBus, thinkingStartTime, thinkingStarted);
+                    }
+                });
     }
 
-    private void forceFinalStream(List<Message> messages, Sinks.Many<String> sink, AtomicBoolean hasSentFinalResult, RoundState state,
-                                  String conversationId, boolean useMemory, AgentState agentState,
-                                  StringBuilder thinkingBuffer, boolean enableThinking) {
+    private void forceFinalStream(List<Message> messages, Sinks.Many<String> sink, AtomicBoolean hasSentFinalResult,
+                                  RoundState state, String conversationId, boolean useMemory, AgentState agentState,
+                                  StringBuilder thinkingBuffer, boolean enableThinking, boolean useEventBus,
+                                  long thinkingStartTime, boolean[] thinkingStarted) {
         List<Message> newMessages = new ArrayList<>();
         if (StringUtils.isNotBlank(systemPrompt)) {
             newMessages.add(new SystemMessage(systemPrompt));
@@ -391,48 +520,76 @@ public class DearAgent extends BaseAgent {
 
         StringBuilder finalTextBuffer = new StringBuilder();
 
-        Disposable disposable = chatClient.prompt().messages(messages).options(buildThinkingOptions(enableThinking)).stream().chatResponse()
+        Disposable disposable = chatClient.prompt().messages(messages).options(buildThinkingOptions(enableThinking))
+                .stream().chatResponse()
                 .publishOn(Schedulers.boundedElastic())
                 .doOnNext(chunk -> {
                     if (chunk == null || chunk.getResult() == null || chunk.getResult().getOutput() == null) return;
                     String text = chunk.getResult().getOutput().getText();
-                    if (text != null && !hasSentFinalResult.get()) {
-                        sink.tryEmitNext(createTextResponse(text));
+                    if (StringUtils.isNotBlank(text) && !hasSentFinalResult.get()) {
+                        if (useEventBus) {
+                            publishTextDelta(text);
+                        } else if (sink != null) {
+                            sink.tryEmitNext(AgentResponse.text(text));
+                        }
                         finalTextBuffer.append(text);
                     }
                 })
                 .doOnComplete(() -> {
-                    String referenceJson = "";
                     String finalText = finalTextBuffer.toString();
                     if (!agentState.searchResults.isEmpty()) {
-                        sink.tryEmitNext(createReferenceResponse(JSON.toJSONString(agentState.searchResults)));
+                        if (useEventBus) {
+                            List<ReferenceEvent.SearchResultItem> items = agentState.searchResults.stream()
+                                    .map(sr -> new ReferenceEvent.SearchResultItem(sr.url(), sr.title(), sr.content()))
+                                    .toList();
+                            eventBus.publish(new ReferenceEvent(items));
+                        } else if (sink != null) {
+                            sink.tryEmitNext(AgentResponse.reference(JSON.toJSONString(agentState.searchResults)));
+                        }
                     }
                     if (enableRecommendations) {
                         String recommendations = generateRecommendations(conversationId, currentQuestion, finalText);
                         if (recommendations != null) {
                             currentRecommendations = recommendations;
-                            sink.tryEmitNext(createRecommendResponse(recommendations));
+                            try {
+                                List<String> questions = JSON.parseArray(recommendations, String.class);
+                                if (questions != null && !questions.isEmpty()) {
+                                    if (useEventBus) {
+                                        eventBus.publish(new RecommendEvent(questions));
+                                    } else if (sink != null) {
+                                        sink.tryEmitNext(AgentResponse.recommend(recommendations, questions.size()));
+                                    }
+                                }
+                            } catch (Exception e) {
+                                if (!useEventBus && sink != null) {
+                                    sink.tryEmitNext(AgentResponse.recommend(recommendations));
+                                }
+                            }
                         }
                     }
-                    sink.tryEmitNext(createDoneResponse(conversationId));
+                    List<String> toolNames = usedTools != null ? new ArrayList<>(usedTools) : List.of();
+                    if (useEventBus) {
+                        publishDone(conversationId, getTotalResponseTime(), 0, toolNames);
+                        eventBus.complete();
+                    } else if (sink != null) {
+                        sink.tryEmitNext(AgentResponse.done(conversationId));
+                        sink.tryEmitComplete();
+                    }
                     hasSentFinalResult.set(true);
-                    sink.tryEmitComplete();
                 })
                 .doOnError(err -> {
                     hasSentFinalResult.set(true);
-                    sink.tryEmitError(err);
+                    if (!useEventBus && sink != null) sink.tryEmitError(err);
                 })
                 .subscribe();
 
         if (conversationId != null && taskManager != null) taskManager.setDisposable(conversationId, disposable);
     }
 
-    /**
-     * 执行工具调用
-     */
-    private void executeToolCalls(Sinks.Many<String> sink, List<AssistantMessage.ToolCall> toolCalls, List<Message> messages,
-                                  AtomicBoolean hasSentFinalResult, RoundState state, AgentState agentState,
-                                  StringBuilder thinkingBuffer, boolean enableThinking, List<JSONObject> toolCallMessages, Runnable onComplete) {
+    private void executeToolCalls(Sinks.Many<String> sink, List<AssistantMessage.ToolCall> toolCalls,
+                                  List<Message> messages, AtomicBoolean hasSentFinalResult, RoundState state,
+                                  AgentState agentState, StringBuilder thinkingBuffer, boolean enableThinking,
+                                  List<JSONObject> toolCallMessages, boolean useEventBus, Runnable onComplete) {
         AtomicInteger completedCount = new AtomicInteger(0);
         int totalToolCalls = toolCalls.size();
         Map<String, ToolResponseMessage.ToolResponse> responseMap = new ConcurrentHashMap<>();
@@ -449,28 +606,25 @@ public class DearAgent extends BaseAgent {
 
                 ToolCallback callback = findTool(toolName);
                 if (callback == null) {
-                    responseMap.put(tc.id(), new ToolResponseMessage.ToolResponse(tc.id(), toolName, "{ \"error\": \"工具未找到：" + toolName + "\" }"));
+                    responseMap.put(tc.id(), new ToolResponseMessage.ToolResponse(tc.id(), toolName,
+                            "{ \"error\": \"工具未找到：" + toolName + "\" }"));
                     completeToolCall(completedCount, totalToolCalls, responseMap, toolCalls, messages, onComplete);
                     return;
                 }
-                String toolType = getToolType(callback);
 
-                // 发射工具开始执行
-                JSONObject toolStartMsg = new JSONObject();
-                toolStartMsg.put("tool", toolName);
-                toolStartMsg.put("status", "start");
-                if (StringUtils.isNotBlank(argsJson)) toolStartMsg.put("args", argsJson);
-                sink.tryEmitNext(emitToolStatus(toolType, toolStartMsg.toJSONString()));
-                toolCallMessages.add(toolStartMsg);
+                // Parse args for structured event
+                Map<String, Object> input = parseArgs(argsJson);
 
-                // 搜索工具额外提示
-//                if (toolName.contains("search")) {
-//                    JSONObject args = JSON.parseObject(argsJson);
-//                    String query = (String) args.get("query");
-//                    String queryThink = StringUtils.isNotBlank(query) ? "正在搜索信息: " + query + "\n" : "正在搜索相关信息\n";
-//                    thinkingBuffer.append(queryThink);
-//                    if (enableThinking) sink.tryEmitNext(createThinkingResponse(queryThink));
-//                }
+                if (useEventBus) {
+                    publishToolStart(tc.id(), toolName, input);
+                } else if (sink != null) {
+                    JSONObject toolStartMsg = new JSONObject();
+                    toolStartMsg.put("tool", toolName);
+                    toolStartMsg.put("status", "start");
+                    if (StringUtils.isNotBlank(argsJson)) toolStartMsg.put("args", argsJson);
+                    sink.tryEmitNext(AgentResponse.function(toolStartMsg.toJSONString()));
+                    toolCallMessages.add(toolStartMsg);
+                }
 
                 try {
                     Object result = callback.call(argsJson);
@@ -479,23 +633,32 @@ public class DearAgent extends BaseAgent {
                     if (toolName.contains("tavily")) parseSearchResult(resultStr, agentState);
                     responseMap.put(tc.id(), new ToolResponseMessage.ToolResponse(tc.id(), toolName, resultStr));
 
-                    // 发射工具执行结果
-                    JSONObject toolDoneMsg = new JSONObject();
-                    toolDoneMsg.put("tool", toolName);
-                    toolDoneMsg.put("status", "done");
-                    toolDoneMsg.put("result", resultStr);
-                    sink.tryEmitNext(emitToolStatus(toolType, toolDoneMsg.toJSONString()));
-                    toolCallMessages.add(toolDoneMsg);
-                } catch (Exception ex) {
-                    responseMap.put(tc.id(), new ToolResponseMessage.ToolResponse(tc.id(), toolName, "{ \"error\": \"工具执行失败：" + ex.getMessage() + "\" }"));
+                    String truncatedResult = resultStr.length() > 500 ? resultStr.substring(0, 500) + "..." : resultStr;
 
-                    // 发射工具执行错误
-                    JSONObject toolErrorMsg = new JSONObject();
-                    toolErrorMsg.put("tool", toolName);
-                    toolErrorMsg.put("status", "error");
-                    toolErrorMsg.put("error", ex.getMessage());
-                    sink.tryEmitNext(emitToolStatus(toolType, toolErrorMsg.toJSONString()));
-                    toolCallMessages.add(toolErrorMsg);
+                    if (useEventBus) {
+                        publishToolEnd(tc.id(), toolName, truncatedResult);
+                    } else if (sink != null) {
+                        JSONObject toolDoneMsg = new JSONObject();
+                        toolDoneMsg.put("tool", toolName);
+                        toolDoneMsg.put("status", "done");
+                        toolDoneMsg.put("result", truncatedResult);
+                        sink.tryEmitNext(AgentResponse.function(toolDoneMsg.toJSONString()));
+                        toolCallMessages.add(toolDoneMsg);
+                    }
+                } catch (Exception ex) {
+                    responseMap.put(tc.id(), new ToolResponseMessage.ToolResponse(tc.id(), toolName,
+                            "{ \"error\": \"工具执行失败：" + ex.getMessage() + "\" }"));
+
+                    if (useEventBus) {
+                        publishToolError(tc.id(), toolName, ex.getMessage());
+                    } else if (sink != null) {
+                        JSONObject toolErrorMsg = new JSONObject();
+                        toolErrorMsg.put("tool", toolName);
+                        toolErrorMsg.put("status", "error");
+                        toolErrorMsg.put("error", ex.getMessage());
+                        sink.tryEmitNext(AgentResponse.function(toolErrorMsg.toJSONString()));
+                        toolCallMessages.add(toolErrorMsg);
+                    }
                 } finally {
                     completeToolCall(completedCount, totalToolCalls, responseMap, toolCalls, messages, onComplete);
                 }
@@ -503,25 +666,13 @@ public class DearAgent extends BaseAgent {
         }
     }
 
-    /**
-     * 根据 ToolCallback 类名判断工具类型：function / mcp / skill
-     */
-    private String getToolType(ToolCallback callback) {
-        String className = callback.getClass().getName().toLowerCase();
-        if (className.contains(".mcp.") || className.contains("mcptool")) return "mcp";
-        if (className.contains("skill")) return "skill";
-        return "function";
-    }
-
-    /**
-     * 根据工具类型发射对应 type 的 SSE 消息
-     */
-    protected String emitToolStatus(String toolType, String content) {
-        return switch (toolType) {
-            case "mcp" -> createMcpResponse(content);
-            case "skill" -> createSkillResponse(content);
-            default -> createToolResponse(content);
-        };
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> parseArgs(String argsJson) {
+        try {
+            return MAPPER.readValue(argsJson, Map.class);
+        } catch (Exception e) {
+            return Map.of("raw", argsJson);
+        }
     }
 
     private void completeToolCall(AtomicInteger completedCount, int total,
@@ -533,7 +684,8 @@ public class DearAgent extends BaseAgent {
             List<ToolResponseMessage.ToolResponse> sortedResponses = new ArrayList<>();
             for (AssistantMessage.ToolCall tc : originalToolCalls) {
                 ToolResponseMessage.ToolResponse response = responseMap.get(tc.id());
-                sortedResponses.add(response != null ? response : new ToolResponseMessage.ToolResponse(tc.id(), tc.name(), "{ \"error\": \"工具响应丢失\" }"));
+                sortedResponses.add(response != null ? response
+                        : new ToolResponseMessage.ToolResponse(tc.id(), tc.name(), "{ \"error\": \"工具响应丢失\" }"));
             }
             messages.add(ToolResponseMessage.builder().responses(sortedResponses).build());
             onComplete.run();
@@ -563,17 +715,17 @@ public class DearAgent extends BaseAgent {
 
     private List<Long> parseKnowledgeBaseIds(String knowledgeBaseIds) {
         if (knowledgeBaseIds == null || knowledgeBaseIds.isBlank()) {
-            return java.util.Collections.emptyList();
+            return Collections.emptyList();
         }
         try {
-            return java.util.Arrays.stream(knowledgeBaseIds.split(","))
+            return Arrays.stream(knowledgeBaseIds.split(","))
                     .map(String::trim)
                     .filter(s -> !s.isEmpty())
                     .map(Long::valueOf)
                     .toList();
         } catch (NumberFormatException e) {
             log.warn("解析 knowledgeBaseIds 失败: {}", knowledgeBaseIds, e);
-            return java.util.Collections.emptyList();
+            return Collections.emptyList();
         }
     }
 
@@ -582,16 +734,10 @@ public class DearAgent extends BaseAgent {
         return v == null || v.isNull() ? null : v.asText();
     }
 
-    private void addErrorToolResponse(List<Message> messages, AssistantMessage.ToolCall toolCall, String errMsg) {
-        messages.add(ToolResponseMessage.builder()
-                .responses(List.of(new ToolResponseMessage.ToolResponse(toolCall.id(), toolCall.name(), "{ \"error\": \"" + errMsg + "\" }")))
-                .build());
-    }
-
     private ChatOptions buildThinkingOptions(boolean enableThinking) {
         return OpenAiChatOptions.builder()
                 .extraBody(Map.of("enable_thinking", enableThinking,
-                        "reasoning_effort", "high")) // 控制DeepSeek-V4系列模型的推理力度,可选值：high：高力度推理；max：最大力度推理
+                        "reasoning_effort", "high"))
                 .internalToolExecutionEnabled(false)
                 .build();
     }
@@ -614,12 +760,6 @@ public class DearAgent extends BaseAgent {
         }
     }
 
-    /**
-     * todo 根据不同的平台获取指定的字段
-     * 阿里："reasoningContent"
-     * deepseek："reasoning_content"
-     * 谷歌："thinking"
-     */
     private String firstNonBlankThinking(Map<String, Object> metadata) {
         String thinking = null;
         for (String key : List.of("reasoningContent", "reasoning", "thinking", "thought", "reasoning_content")) {
@@ -629,6 +769,7 @@ public class DearAgent extends BaseAgent {
         return null;
     }
 
+    @SuppressWarnings("unchecked")
     private String extractString(Object value) {
         if (value == null) return null;
         if (value instanceof String str) return str;
@@ -637,7 +778,7 @@ public class DearAgent extends BaseAgent {
             for (Object item : collection) {
                 String text = extractString(item);
                 if (StringUtils.isNotBlank(text)) {
-                    if (sb.length() > 0) sb.append('\n');
+                    if (!sb.isEmpty()) sb.append('\n');
                     sb.append(text);
                 }
             }
@@ -657,30 +798,6 @@ public class DearAgent extends BaseAgent {
         this.maxRounds = maxRounds;
     }
 
-    /**
-     * 截断 reference JSON 中各结果的 content 字段，防止超出数据库列限制。
-     */
-    private String truncateReferenceJson(String referenceJson) {
-        if (referenceJson == null || referenceJson.length() <= 500) {
-            return referenceJson;
-        }
-        try {
-            var results = JSON.parseArray(referenceJson);
-            if (results != null) {
-                for (int i = 0; i < results.size(); i++) {
-                    JSONObject item = results.getJSONObject(i);
-                    String content = item.getString("content");
-                    if (content != null && content.length() > 500) {
-                        item.put("content", content.substring(0, 500) + "...");
-                    }
-                }
-                return JSON.toJSONString(results);
-            }
-        } catch (Exception ignored) {
-        }
-        return referenceJson;
-    }
-
     public static Builder builder() {
         return new Builder();
     }
@@ -698,81 +815,30 @@ public class DearAgent extends BaseAgent {
         private ChatMessageService messageService;
         private AgentTaskManager taskManager;
         private KnowledgeRetrievalService knowledgeRetrievalService;
-        private boolean think;
+        private AgentEventBus eventBus;
 
-        public Builder chatMemory(ChatMemory chatMemory) {
-            this.chatMemory = chatMemory;
-            return this;
-        }
-
-        public Builder conversationService(ChatConversationService conversationService) {
-            this.conversationService = conversationService;
-            return this;
-        }
-
-        public Builder messageService(ChatMessageService messageService) {
-            this.messageService = messageService;
-            return this;
-        }
-
-        public Builder taskManager(AgentTaskManager taskManager) {
-            this.taskManager = taskManager;
-            return this;
-        }
-
-        public Builder knowledgeRetrievalService(KnowledgeRetrievalService knowledgeRetrievalService) {
-            this.knowledgeRetrievalService = knowledgeRetrievalService;
-            return this;
-        }
-
-        public Builder name(String name) {
-            this.name = name;
-            return this;
-        }
-
-        public Builder chatModel(ChatModel chatModel) {
-            this.chatModel = chatModel;
-            return this;
-        }
-
-        public Builder tools(ToolCallback... tools) {
-            this.tools = Arrays.asList(tools);
-            return this;
-        }
-
-        public Builder tools(List<ToolCallback> tools) {
-            this.tools = tools;
-            return this;
-        }
-
-        public Builder advisors(List<Advisor> advisors) {
-            this.advisors = advisors;
-            return this;
-        }
-
-        public Builder advisors(Advisor... advisors) {
-            this.advisors = Arrays.asList(advisors);
-            return this;
-        }
-
-        public Builder systemPrompt(String systemPrompt) {
-            this.systemPrompt = systemPrompt;
-            return this;
-        }
-
-        public Builder maxReflectionRounds(int maxReflectionRounds) {
-            this.maxReflectionRounds = maxReflectionRounds;
-            return this;
-        }
-
-        public Builder maxRounds(int maxRounds) {
-            this.maxRounds = maxRounds;
-            return this;
-        }
+        public Builder name(String name) { this.name = name; return this; }
+        public Builder chatModel(ChatModel chatModel) { this.chatModel = chatModel; return this; }
+        public Builder tools(ToolCallback... tools) { this.tools = Arrays.asList(tools); return this; }
+        public Builder tools(List<ToolCallback> tools) { this.tools = tools; return this; }
+        public Builder systemPrompt(String systemPrompt) { this.systemPrompt = systemPrompt; return this; }
+        public Builder maxRounds(int maxRounds) { this.maxRounds = maxRounds; return this; }
+        public Builder maxReflectionRounds(int maxReflectionRounds) { this.maxReflectionRounds = maxReflectionRounds; return this; }
+        public Builder advisors(List<Advisor> advisors) { this.advisors = advisors; return this; }
+        public Builder advisors(Advisor... advisors) { this.advisors = Arrays.asList(advisors); return this; }
+        public Builder chatMemory(ChatMemory chatMemory) { this.chatMemory = chatMemory; return this; }
+        public Builder conversationService(ChatConversationService conversationService) { this.conversationService = conversationService; return this; }
+        public Builder messageService(ChatMessageService messageService) { this.messageService = messageService; return this; }
+        public Builder taskManager(AgentTaskManager taskManager) { this.taskManager = taskManager; return this; }
+        public Builder knowledgeRetrievalService(KnowledgeRetrievalService knowledgeRetrievalService) { this.knowledgeRetrievalService = knowledgeRetrievalService; return this; }
+        public Builder eventBus(AgentEventBus eventBus) { this.eventBus = eventBus; return this; }
 
         public DearAgent build() {
             if (chatModel == null) throw new IllegalArgumentException("chatModel 不能为空！");
-            return new DearAgent(name, chatModel, tools, systemPrompt, maxRounds, chatMemory, advisors, maxReflectionRounds, conversationService, messageService, taskManager, knowledgeRetrievalService);
+            DearAgent agent = new DearAgent(name, chatModel, tools, systemPrompt, maxRounds, chatMemory, advisors,
+                    maxReflectionRounds, conversationService, messageService, taskManager, knowledgeRetrievalService);
+            if (eventBus != null) agent.setEventBus(eventBus);
+            return agent;
         }
     }
 }

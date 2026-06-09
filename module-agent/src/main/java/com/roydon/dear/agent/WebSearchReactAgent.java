@@ -8,6 +8,8 @@ import com.roydon.dear.agent.orchestrator.SubAgentContext;
 import com.roydon.dear.agent.registry.AgentMetadata;
 import com.roydon.dear.common.AgentResponse;
 import com.roydon.dear.common.domain.agent.AgentState;
+import com.roydon.dear.event.events.ReferenceEvent;
+import com.roydon.dear.event.events.RecommendEvent;
 import com.roydon.dear.common.domain.agent.RoundMode;
 import com.roydon.dear.common.domain.agent.RoundState;
 import com.roydon.dear.common.domain.agent.SearchResult;
@@ -169,7 +171,7 @@ public class WebSearchReactAgent extends BaseAgent implements AgentMetadata {
             String toolsStr = getUsedToolsString();
             String referenceJson = "";
             if (!agentState.searchResults.isEmpty())
-                referenceJson = createReferenceResponse(JSON.toJSONString(agentState.searchResults));
+                referenceJson = AgentResponse.reference(JSON.toJSONString(agentState.searchResults));
             messageService.saveAssistantMessage(
                     currentConversationNumericId, currentUserMessageId,
                     finalAnswerBuffer.toString(), thinkingBuffer.toString(),
@@ -214,8 +216,9 @@ public class WebSearchReactAgent extends BaseAgent implements AgentMetadata {
             for (AssistantMessage.ToolCall incoming : tc) mergeToolCall(state, incoming);
             return;
         }
-        if (text != null) {
-            sink.tryEmitNext(createTextResponse(text));
+        if (StringUtils.isNotBlank(text)) {
+            sink.tryEmitNext(AgentResponse.text(text));
+            if (eventBus != null) publishTextDelta(text);
             state.textBuffer.append(text);
         }
     }
@@ -237,13 +240,28 @@ public class WebSearchReactAgent extends BaseAgent implements AgentMetadata {
                              boolean useMemory, String conversationId, AgentState agentState, StringBuilder thinkingBuffer) {
         if (state.getMode() != RoundMode.TOOL_CALL) {
             String finalText = state.textBuffer.toString();
-            if (!agentState.searchResults.isEmpty())
-                sink.tryEmitNext(createReferenceResponse(JSON.toJSONString(agentState.searchResults)));
+            if (!agentState.searchResults.isEmpty()) {
+                sink.tryEmitNext(AgentResponse.reference(JSON.toJSONString(agentState.searchResults)));
+                if (eventBus != null) {
+                    List<ReferenceEvent.SearchResultItem> items = agentState.searchResults.stream()
+                            .map(sr -> new ReferenceEvent.SearchResultItem(sr.url(), sr.title(), sr.content()))
+                            .toList();
+                    eventBus.publish(new ReferenceEvent(items));
+                }
+            }
             if (enableRecommendations) {
                 String recommendations = generateRecommendations(conversationId, currentQuestion, finalText);
                 if (recommendations != null) {
                     currentRecommendations = recommendations;
-                    sink.tryEmitNext(createRecommendResponse(recommendations));
+                    sink.tryEmitNext(AgentResponse.recommend(recommendations));
+                    if (eventBus != null) {
+                        try {
+                            List<String> questions = JSON.parseArray(recommendations, String.class);
+                            if (questions != null && !questions.isEmpty()) {
+                                eventBus.publish(new RecommendEvent(questions));
+                            }
+                        } catch (Exception ignored) {}
+                    }
                 }
             }
             sink.tryEmitComplete();
@@ -288,19 +306,34 @@ public class WebSearchReactAgent extends BaseAgent implements AgentMetadata {
                     if (chunk == null || chunk.getResult() == null || chunk.getResult().getOutput() == null) return;
                     String text = chunk.getResult().getOutput().getText();
                     if (text != null && !hasSentFinalResult.get()) {
-                        sink.tryEmitNext(createTextResponse(text));
+                        sink.tryEmitNext(AgentResponse.text(text));
                         finalTextBuffer.append(text);
                     }
                 })
                 .doOnComplete(() -> {
                     String finalText = finalTextBuffer.toString();
-                    if (!agentState.searchResults.isEmpty())
-                        sink.tryEmitNext(createReferenceResponse(JSON.toJSONString(agentState.searchResults)));
+                    if (!agentState.searchResults.isEmpty()) {
+                        sink.tryEmitNext(AgentResponse.reference(JSON.toJSONString(agentState.searchResults)));
+                        if (eventBus != null) {
+                            List<ReferenceEvent.SearchResultItem> items = agentState.searchResults.stream()
+                                    .map(sr -> new ReferenceEvent.SearchResultItem(sr.url(), sr.title(), sr.content()))
+                                    .toList();
+                            eventBus.publish(new ReferenceEvent(items));
+                        }
+                    }
                     if (enableRecommendations) {
                         String recommendations = generateRecommendations(conversationId, currentQuestion, finalText);
                         if (recommendations != null) {
                             currentRecommendations = recommendations;
-                            sink.tryEmitNext(createRecommendResponse(recommendations));
+                            sink.tryEmitNext(AgentResponse.recommend(recommendations));
+                            if (eventBus != null) {
+                                try {
+                                    List<String> questions = JSON.parseArray(recommendations, String.class);
+                                    if (questions != null && !questions.isEmpty()) {
+                                        eventBus.publish(new RecommendEvent(questions));
+                                    }
+                                } catch (Exception ignored) {}
+                            }
                         }
                     }
                     hasSentFinalResult.set(true);
@@ -341,7 +374,7 @@ public class WebSearchReactAgent extends BaseAgent implements AgentMetadata {
                     JSONObject args = JSON.parseObject(argsJson);
                     String query = (String) args.get("query");
                     String queryThink = StringUtils.isNotBlank(query) ? "🔍 正在搜索信息: " + query + "\n" : "🔍 正在搜索相关信息\n";
-                    sink.tryEmitNext(createThinkingResponse(queryThink));
+                    sink.tryEmitNext(AgentResponse.thinking(queryThink));
                 }
 
                 try {
@@ -529,7 +562,7 @@ public class WebSearchReactAgent extends BaseAgent implements AgentMetadata {
         if (state.getMode() != RoundMode.TOOL_CALL) {
             String finalText = state.textBuffer.toString();
             if (!agentState.searchResults.isEmpty()) {
-                subSink.tryEmitNext(createReferenceResponse(JSON.toJSONString(agentState.searchResults)));
+                subSink.tryEmitNext(AgentResponse.reference(JSON.toJSONString(agentState.searchResults)));
             }
             subSink.tryEmitComplete();
             hasSentFinalResult.set(true);
@@ -571,13 +604,13 @@ public class WebSearchReactAgent extends BaseAgent implements AgentMetadata {
                     if (chunk == null || chunk.getResult() == null || chunk.getResult().getOutput() == null) return;
                     String text = chunk.getResult().getOutput().getText();
                     if (text != null && !hasSentFinalResult.get()) {
-                        subSink.tryEmitNext(createTextResponse(text));
+                        subSink.tryEmitNext(AgentResponse.text(text));
                         finalTextBuffer.append(text);
                     }
                 })
                 .doOnComplete(() -> {
                     if (!agentState.searchResults.isEmpty()) {
-                        subSink.tryEmitNext(createReferenceResponse(JSON.toJSONString(agentState.searchResults)));
+                        subSink.tryEmitNext(AgentResponse.reference(JSON.toJSONString(agentState.searchResults)));
                     }
                     hasSentFinalResult.set(true);
                     subSink.tryEmitComplete();
@@ -620,7 +653,7 @@ public class WebSearchReactAgent extends BaseAgent implements AgentMetadata {
                     String queryThink = StringUtils.isNotBlank(query)
                             ? "🔍 正在搜索信息: " + query + "\n"
                             : "🔍 正在搜索相关信息\n";
-                    subSink.tryEmitNext(createThinkingResponse(queryThink));
+                    subSink.tryEmitNext(AgentResponse.thinking(queryThink));
                 }
                 try {
                     Object result = callback.call(argsJson);
@@ -648,7 +681,7 @@ public class WebSearchReactAgent extends BaseAgent implements AgentMetadata {
                     && !answer.isEmpty()) {
                 String referenceJson = "";
                 if (!agentState.searchResults.isEmpty()) {
-                    referenceJson = createReferenceResponse(
+                    referenceJson = AgentResponse.reference(
                             truncateReferenceJson(JSON.toJSONString(agentState.searchResults)));
                 }
                 ctx.getMessageService().saveAssistantMessage(
@@ -706,6 +739,7 @@ public class WebSearchReactAgent extends BaseAgent implements AgentMetadata {
         private ChatConversationService conversationService;
         private ChatMessageService messageService;
         private AgentTaskManager taskManager;
+        private com.roydon.dear.event.AgentEventBus eventBus;
 
         public Builder chatMemory(ChatMemory chatMemory) {
             this.chatMemory = chatMemory;
@@ -724,6 +758,11 @@ public class WebSearchReactAgent extends BaseAgent implements AgentMetadata {
 
         public Builder taskManager(AgentTaskManager taskManager) {
             this.taskManager = taskManager;
+            return this;
+        }
+
+        public Builder eventBus(com.roydon.dear.event.AgentEventBus eventBus) {
+            this.eventBus = eventBus;
             return this;
         }
 
@@ -774,7 +813,10 @@ public class WebSearchReactAgent extends BaseAgent implements AgentMetadata {
 
         public WebSearchReactAgent build() {
             if (chatModel == null) throw new IllegalArgumentException("chatModel 不能为空！");
-            return new WebSearchReactAgent(name, chatModel, tools, systemPrompt, maxRounds, chatMemory, advisors, maxReflectionRounds, conversationService, messageService, taskManager);
+            WebSearchReactAgent agent = new WebSearchReactAgent(name, chatModel, tools, systemPrompt, maxRounds,
+                    chatMemory, advisors, maxReflectionRounds, conversationService, messageService, taskManager);
+            if (eventBus != null) agent.setEventBus(eventBus);
+            return agent;
         }
     }
 }

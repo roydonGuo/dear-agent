@@ -8,6 +8,9 @@ import com.roydon.dear.agent.orchestrator.SimpleOrchestrator;
 import com.roydon.dear.agent.registry.AgentRegistry;
 import com.roydon.dear.common.AgentResponse;
 import com.roydon.dear.common.manager.AgentTaskManager;
+import com.roydon.dear.event.AgentEventBus;
+import com.roydon.dear.event.DefaultAgentEventBus;
+import com.roydon.dear.event.SseEventEmitter;
 import com.roydon.dear.common.prompts.ReactAgentPrompts;
 import com.roydon.dear.knowledge.rag.retriever.KnowledgeRetrievalService;
 import com.roydon.dear.model.registry.ModelRegistry;
@@ -83,13 +86,30 @@ public class MultiAgentController {
         log.info("多Agent协同请求: query={}, conversationId={}, mode={}", query, conversationId, mode);
 
         try {
+            // 创建事件总线和 SSE 发射器
+            AgentEventBus eventBus = new DefaultAgentEventBus();
+            SseEventEmitter sseEmitter = new SseEventEmitter(eventBus);
+
             if ("plan_execute".equals(mode)) {
-                PlanExecuteAgent agent = buildPlanExecuteAgent();
-                return agent.execute(conversationId, query);
+                PlanExecuteAgent agent = buildPlanExecuteAgent(eventBus);
+                Flux<String> agentStream = agent.execute(conversationId, query);
+                // 订阅以触发 doFinally（保存 + 清理），SSE 输出由 sseEmitter 提供
+                agentStream.subscribe(
+                        null,
+                        error -> log.error("PlanExecuteAgent error: {}", error.getMessage()),
+                        () -> log.debug("PlanExecuteAgent completed")
+                );
+                return sseEmitter.toSseFlux();
             }
             // 默认 mode=auto: SimpleOrchestrator
-            SimpleOrchestrator orchestrator = buildOrchestrator(conversationId, fileIds);
-            return orchestrator.stream(conversationId, query, Boolean.TRUE.equals(think), fileIds, null, null);
+            SimpleOrchestrator orchestrator = buildOrchestrator(conversationId, fileIds, eventBus);
+            Flux<String> agentStream = orchestrator.stream(conversationId, query, Boolean.TRUE.equals(think), fileIds, null, null);
+            agentStream.subscribe(
+                    null,
+                    error -> log.error("Orchestrator error: {}", error.getMessage()),
+                    () -> log.debug("Orchestrator completed")
+            );
+            return sseEmitter.toSseFlux();
         } catch (Exception e) {
             log.error("多Agent协同异常", e);
             return Flux.just(
@@ -112,6 +132,10 @@ public class MultiAgentController {
     // ===== 编排器构建（与 AgentController.initDearAgent 平行，互不影响） =====
 
     private SimpleOrchestrator buildOrchestrator(String conversationId, String fileIds) {
+        return buildOrchestrator(conversationId, fileIds, null);
+    }
+
+    private SimpleOrchestrator buildOrchestrator(String conversationId, String fileIds, AgentEventBus eventBus) {
         String systemPrompt = loadSystemPrompt(conversationId, fileIds);
         ToolCallback[] tools = mcpToolManager.getAllTools();
         ChatModel chatModel = modelRegistry.getDefaultChatModel(ModelCategoryEnum.CHAT.getCode());
@@ -135,6 +159,7 @@ public class MultiAgentController {
                 .knowledgeRetrievalService(knowledgeRetrievalService)
                 .maxRounds(50)
                 .agentRegistry(agentRegistry)
+                .eventBus(eventBus)
                 .build();
 
         if (StringUtils.isNotBlank(conversationId)) {
@@ -144,7 +169,7 @@ public class MultiAgentController {
         return orchestrator;
     }
 
-    private PlanExecuteAgent buildPlanExecuteAgent() {
+    private PlanExecuteAgent buildPlanExecuteAgent(AgentEventBus eventBus) {
         ToolCallback[] tools = mcpToolManager.getAllTools();
         ChatModel chatModel = modelRegistry.getDefaultChatModel(ModelCategoryEnum.CHAT.getCode());
 
@@ -160,6 +185,7 @@ public class MultiAgentController {
                 .conversationService(conversationService)
                 .messageService(messageService)
                 .taskManager(taskManager)
+                .eventBus(eventBus)
                 .build();
     }
 

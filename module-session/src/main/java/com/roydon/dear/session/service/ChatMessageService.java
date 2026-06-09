@@ -21,6 +21,7 @@ public interface ChatMessageService extends IService<ChatMessage> {
                                 String fileid,
                                 String fileIds);
 
+    @Deprecated
     ChatMessage saveAssistantMessage(Long conversationId,
                                      Long replyId,
                                      String content,
@@ -32,6 +33,9 @@ public interface ChatMessageService extends IService<ChatMessage> {
                                      Long firstResponseTime,
                                      Long totalResponseTime,
                                      String fileIds);
+
+    /** 新接口：仅存储 event_stream 完整事件数组，旧字段不再写入 */
+    ChatMessage saveAssistantMessage(Long conversationId, Long replyId, String eventStream);
 
     void evictByConversationId(Long conversationId);
 }

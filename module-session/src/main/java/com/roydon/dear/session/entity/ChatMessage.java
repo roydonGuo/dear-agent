@@ -21,28 +21,38 @@ public class ChatMessage implements Serializable {
 
     private String messageType;
 
+    private String eventStream;
+
+    @Deprecated
     private String content;
 
     private String useContext;
 
     private String delFlag;
 
+    @Deprecated
     private String tools;
 
+    @Deprecated
     private String thinking;
 
+    @Deprecated
     private String reference;
 
+    @Deprecated
     private String recommend;
 
+    @Deprecated
     private String knowledge;
 
     private String fileid;
 
     private String fileIds;
 
+    @Deprecated
     private Long firstResponseTime;
 
+    @Deprecated
     private Long totalResponseTime;
 
     private LocalDateTime createTime;

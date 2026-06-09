@@ -115,6 +115,7 @@ public class ChatMessageServiceImpl extends ServiceImpl<ChatMessageMapper, ChatM
     }
 
     @Override
+    @Deprecated
     public ChatMessage saveAssistantMessage(Long conversationId, Long replyId, String content,
                                             String thinking, String tools, String reference,
                                             String recommend, String knowledge, Long firstResponseTime,
@@ -140,6 +141,61 @@ public class ChatMessageServiceImpl extends ServiceImpl<ChatMessageMapper, ChatM
         getSelf().evictByConversationId(conversationId);
         appendToMemoryCache(msg);
         return msg;
+    }
+
+    @Override
+    public ChatMessage saveAssistantMessage(Long conversationId, Long replyId, String eventStream) {
+        ChatMessage msg = new ChatMessage();
+        msg.setConversationId(conversationId);
+        msg.setReplyId(replyId);
+        msg.setMessageType("assistant");
+        msg.setEventStream(eventStream);
+        msg.setUseContext("1");
+        msg.setDelFlag("0");
+        msg.setCreateTime(LocalDateTime.now());
+        save(msg);
+        getSelf().evictByConversationId(conversationId);
+        // 从 eventStream 中提取纯文本用于内存缓存
+        extractAndCacheContent(msg);
+        return msg;
+    }
+
+    private void extractAndCacheContent(ChatMessage msg) {
+        if (redissonClient == null || msg.getConversationId() == null || msg.getEventStream() == null) return;
+        try {
+            RList<Map<String, String>> list = redissonClient.getList(CHAT_MEMORY_KEY + msg.getConversationId());
+            Map<String, String> entry = new HashMap<>(4);
+            entry.put("t", msg.getMessageType());
+            // 从 eventStream 中提取 text_delta 文本内容
+            entry.put("c", extractTextFromEventStream(msg.getEventStream()));
+            list.add(entry);
+            while (list.size() > CHAT_MEMORY_MAX_SIZE) {
+                list.remove(0);
+            }
+            list.expire(1, TimeUnit.HOURS);
+        } catch (Exception e) {
+            log.warn("更新chat memory缓存失败: conversationId={}", msg.getConversationId(), e);
+        }
+    }
+
+    private String extractTextFromEventStream(String eventStream) {
+        try {
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            com.fasterxml.jackson.databind.JsonNode root = mapper.readTree(eventStream);
+            if (root.isArray()) {
+                StringBuilder sb = new StringBuilder();
+                for (var node : root) {
+                    if ("text_delta".equals(node.path("type").asText())) {
+                        sb.append(node.path("text").asText());
+                    }
+                }
+                String text = sb.toString();
+                return text.length() > 200 ? text.substring(0, 200) : text;
+            }
+        } catch (Exception e) {
+            log.debug("解析eventStream提取文本失败: {}", e.getMessage());
+        }
+        return "";
     }
 
     @Override

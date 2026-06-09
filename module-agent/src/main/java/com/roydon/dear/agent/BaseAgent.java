@@ -1,9 +1,19 @@
 package com.roydon.dear.agent;
 
 import com.alibaba.fastjson2.JSON;
-import com.roydon.dear.common.AgentResponse;
 import com.roydon.dear.common.manager.AgentTaskManager;
 import com.roydon.dear.common.prompts.ReactAgentPrompts;
+import com.roydon.dear.event.AgentEventBus;
+import com.roydon.dear.event.events.DoneEvent;
+import com.roydon.dear.event.events.ErrorEvent;
+import com.roydon.dear.event.events.TextDeltaEvent;
+import com.roydon.dear.event.events.ThinkingStartEvent;
+import com.roydon.dear.event.events.ThinkingTextEvent;
+import com.roydon.dear.event.events.ThinkingEndEvent;
+import com.roydon.dear.event.events.ToolStartEvent;
+import com.roydon.dear.event.events.ToolEndEvent;
+import com.roydon.dear.event.events.ToolErrorEvent;
+import com.roydon.dear.event.events.KnowledgeEndEvent;
 import com.roydon.dear.session.entity.ChatConversation;
 import com.roydon.dear.session.entity.ChatMessage;
 import com.roydon.dear.session.service.ChatConversationService;
@@ -25,6 +35,7 @@ import reactor.core.publisher.Sinks;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 @Slf4j
@@ -36,6 +47,7 @@ public abstract class BaseAgent {
     protected ChatConversationService conversationService;
     protected ChatMessageService messageService;
     protected AgentTaskManager taskManager;
+    protected AgentEventBus eventBus;
     protected String agentType;
 
     protected boolean enableRecommendations = false;
@@ -56,6 +68,48 @@ public abstract class BaseAgent {
     }
 
     public abstract Flux<String> execute(String conversationId, String question);
+
+    // ===== Event publishing convenience methods =====
+
+    protected void publishThinkingStart() {
+        if (eventBus != null) eventBus.publish(new ThinkingStartEvent());
+    }
+
+    protected void publishThinkingText(String text) {
+        if (eventBus != null) eventBus.publish(new ThinkingTextEvent(text));
+    }
+
+    protected void publishThinkingEnd(long durationMs) {
+        if (eventBus != null) eventBus.publish(new ThinkingEndEvent(durationMs));
+    }
+
+    protected void publishTextDelta(String text) {
+        if (eventBus != null) eventBus.publish(new TextDeltaEvent(text));
+    }
+
+    protected void publishToolStart(String id, String name, Map<String, Object> input) {
+        if (eventBus != null) eventBus.publish(new ToolStartEvent(id, name, input));
+    }
+
+    protected void publishToolEnd(String id, String name, String result) {
+        if (eventBus != null) eventBus.publish(new ToolEndEvent(id, name, result));
+    }
+
+    protected void publishToolError(String id, String name, String error) {
+        if (eventBus != null) eventBus.publish(new ToolErrorEvent(id, name, error));
+    }
+
+    protected void publishKnowledgeEnd(List<KnowledgeEndEvent.KnowledgeItem> items, int count) {
+        if (eventBus != null) eventBus.publish(new KnowledgeEndEvent(items, count));
+    }
+
+    protected void publishDone(String conversationId, long totalMs, int rounds, List<String> tools) {
+        if (eventBus != null) eventBus.publish(new DoneEvent(conversationId, totalMs, rounds, tools));
+    }
+
+    protected void publishError(String conversationId, String message, String code) {
+        if (eventBus != null) eventBus.publish(new ErrorEvent(conversationId, message, code));
+    }
 
     // ===== 通用方法 =====
 
@@ -89,7 +143,6 @@ public abstract class BaseAgent {
         if (conversation == null) {
             return MessageWindowChatMemory.builder().maxMessages(maxMessages).build();
         }
-        // 从 Redis 缓存读取最近消息（DESC 顺序），未命中时回退 DB 并预热缓存
         List<ChatMessage> history = messageService.getRecentMessagesForMemory(conversation.getId(), maxMessages * 2);
         ChatMemory chatMemory = MessageWindowChatMemory.builder().maxMessages(maxMessages).build();
         if (history != null && !history.isEmpty()) {
@@ -104,54 +157,6 @@ public abstract class BaseAgent {
             log.debug("加载会话历史: sessionId={}, recordCount={}", sessionId, history.size());
         }
         return chatMemory;
-    }
-
-    protected String createResponse(String content, String type) {
-        return AgentResponse.json(type, content);
-    }
-
-    protected String createTextResponse(String content) {
-        return AgentResponse.text(content);
-    }
-
-    protected String createThinkingResponse(String content) {
-        return AgentResponse.thinking(content);
-    }
-
-    protected String createReferenceResponse(String content) {
-        return AgentResponse.reference(content);
-    }
-
-    protected String createErrorResponse(String content) {
-        return AgentResponse.error(content);
-    }
-
-    protected String createRecommendResponse(String content) {
-        return AgentResponse.recommend(content);
-    }
-
-    protected String createFunctionResponse(String content) {
-        return AgentResponse.function(content);
-    }
-
-    protected String createToolResponse(String content) {
-        return AgentResponse.tool(content);
-    }
-
-    protected String createMcpResponse(String content) {
-        return AgentResponse.mcp(content);
-    }
-
-    protected String createSkillResponse(String content) {
-        return AgentResponse.skill(content);
-    }
-
-    protected String createKnowledgeResponse(String content, Integer count) {
-        return AgentResponse.knowledge(content, count);
-    }
-
-    protected String createDoneResponse(String content) {
-        return AgentResponse.done(content);
     }
 
     protected void recordFirstResponse() {
@@ -230,6 +235,10 @@ public abstract class BaseAgent {
             log.error("生成推荐问题异常", e);
             return null;
         }
+    }
+
+    public void setEventBus(AgentEventBus eventBus) {
+        this.eventBus = eventBus;
     }
 
     public void setChatMemory(ChatMemory chatMemory) {
