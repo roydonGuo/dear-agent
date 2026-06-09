@@ -13,7 +13,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -63,42 +65,68 @@ public class FileOperationTools {
     @Tool(name = "read_file", description = "读取文件内容，支持可选的 limit 参数 / Read file with optional limit")
     public String readFile(
             @ToolParam(description = "文件路径") String filePath,
-            @ToolParam(description = "读取的行数限制，不指定则读取全部") Integer limit) {
+            @ToolParam(description = "读取的行数限制，不指定则读取全部") Integer limit,
+            @ToolParam(description = "超时时间（秒），默认 60") Long timeoutSeconds) {
         log.info("EXECUTE Tool: read_file: {}", filePath);
+        long timeout = timeoutSeconds != null && timeoutSeconds > 0 ? timeoutSeconds : 60;
         try {
-            Path path = Paths.get(filePath).normalize();
-            if (!Files.exists(path)) return "文件不存在: " + filePath;
-            if (!Files.isReadable(path)) return "文件不可读: " + filePath;
-            if (limit != null && limit > 0) {
-                java.util.List<String> allLines = Files.readAllLines(path, StandardCharsets.UTF_8);
-                long totalLines = allLines.size();
-                long actualLimit = Math.min(limit, totalLines);
-                String content = allLines.subList(0, (int) actualLimit).stream().collect(Collectors.joining("\n"));
-                if (totalLines > limit) content += "\n\n... (文件共 " + totalLines + " 行，仅显示前 " + limit + " 行)";
-                return content;
-            } else {
-                return Files.readString(path, StandardCharsets.UTF_8);
-            }
+            return CompletableFuture.supplyAsync(() -> {
+                Path path = Paths.get(filePath).normalize();
+                if (!Files.exists(path)) return "文件不存在: " + filePath;
+                if (!Files.isReadable(path)) return "文件不可读: " + filePath;
+                if (limit != null && limit > 0) {
+                    try {
+                        java.util.List<String> allLines = Files.readAllLines(path, StandardCharsets.UTF_8);
+                        long totalLines = allLines.size();
+                        long actualLimit = Math.min(limit, totalLines);
+                        String content = allLines.subList(0, (int) actualLimit).stream().collect(Collectors.joining("\n"));
+                        if (totalLines > limit) content += "\n\n... (文件共 " + totalLines + " 行，仅显示前 " + limit + " 行)";
+                        return content;
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                } else {
+                    try {
+                        return Files.readString(path, StandardCharsets.UTF_8);
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+            }).get(timeout, TimeUnit.SECONDS);
+        } catch (TimeoutException e) {
+            return "操作超时（" + timeout + "秒）";
         } catch (Exception e) {
             log.error("读取文件失败", e);
-            return "读取文件失败: " + e.getMessage();
+            Throwable cause = e.getCause();
+            return "读取文件失败: " + (cause != null ? cause.getMessage() : e.getMessage());
         }
     }
 
     @Tool(name = "write_file", description = "写入文件（覆盖）/ Write (overwrite) file")
     public String writeFile(
             @ToolParam(description = "文件路径") String filePath,
-            @ToolParam(description = "文件内容") String content) {
+            @ToolParam(description = "文件内容") String content,
+            @ToolParam(description = "超时时间（秒），默认 60") Long timeoutSeconds) {
         log.info("EXECUTE Tool: write_file: {}", filePath);
+        long timeout = timeoutSeconds != null && timeoutSeconds > 0 ? timeoutSeconds : 60;
         try {
-            Path path = Paths.get(filePath).normalize();
-            Path parent = path.getParent();
-            if (parent != null && !Files.exists(parent)) Files.createDirectories(parent);
-            Files.writeString(path, content, StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-            return "文件写入成功: " + path.toAbsolutePath() + " (大小: " + content.length() + " 字符)";
+            return CompletableFuture.supplyAsync(() -> {
+                try {
+                    Path path = Paths.get(filePath).normalize();
+                    Path parent = path.getParent();
+                    if (parent != null && !Files.exists(parent)) Files.createDirectories(parent);
+                    Files.writeString(path, content, StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+                    return "文件写入成功: " + path.toAbsolutePath() + " (大小: " + content.length() + " 字符)";
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            }).get(timeout, TimeUnit.SECONDS);
+        } catch (TimeoutException e) {
+            return "操作超时（" + timeout + "秒）";
         } catch (Exception e) {
             log.error("写入文件失败", e);
-            return "写入文件失败: " + e.getMessage();
+            Throwable cause = e.getCause();
+            return "写入文件失败: " + (cause != null ? cause.getMessage() : e.getMessage());
         }
     }
 
@@ -106,19 +134,30 @@ public class FileOperationTools {
     public String editFile(
             @ToolParam(description = "文件路径") String filePath,
             @ToolParam(description = "要替换的原始文本") String oldString,
-            @ToolParam(description = "替换后的新文本") String newString) {
+            @ToolParam(description = "替换后的新文本") String newString,
+            @ToolParam(description = "超时时间（秒），默认 60") Long timeoutSeconds) {
         log.info("EXECUTE Tool: edit_file: {}", filePath);
+        long timeout = timeoutSeconds != null && timeoutSeconds > 0 ? timeoutSeconds : 60;
         try {
-            Path path = Paths.get(filePath).normalize();
-            if (!Files.exists(path)) return "文件不存在: " + filePath;
-            String content = Files.readString(path, StandardCharsets.UTF_8);
-            if (!content.contains(oldString)) return "替换失败: 文件中未找到匹配的文本";
-            String newContent = content.replaceFirst(Pattern.quote(oldString), Matcher.quoteReplacement(newString));
-            Files.writeString(path, newContent, StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-            return "替换成功: " + path.toAbsolutePath();
+            return CompletableFuture.supplyAsync(() -> {
+                try {
+                    Path path = Paths.get(filePath).normalize();
+                    if (!Files.exists(path)) return "文件不存在: " + filePath;
+                    String content = Files.readString(path, StandardCharsets.UTF_8);
+                    if (!content.contains(oldString)) return "替换失败: 文件中未找到匹配的文本";
+                    String newContent = content.replaceFirst(Pattern.quote(oldString), Matcher.quoteReplacement(newString));
+                    Files.writeString(path, newContent, StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+                    return "替换成功: " + path.toAbsolutePath();
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            }).get(timeout, TimeUnit.SECONDS);
+        } catch (TimeoutException e) {
+            return "操作超时（" + timeout + "秒）";
         } catch (Exception e) {
             log.error("编辑文件失败", e);
-            return "编辑文件失败: " + e.getMessage();
+            Throwable cause = e.getCause();
+            return "编辑文件失败: " + (cause != null ? cause.getMessage() : e.getMessage());
         }
     }
 }
