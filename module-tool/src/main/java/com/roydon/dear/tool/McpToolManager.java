@@ -29,14 +29,22 @@ public class McpToolManager {
     @Autowired
     private FileOperationTools fileOperationTools;
 
+    @Autowired
+    private MathTools mathTools;
+
     private ToolCallback[] fileToolCallbacks;
+
+    private ToolCallback[] mathToolCallbacks;
 
     @PostConstruct
     public void init() {
         MethodToolCallbackProvider fileProvider = MethodToolCallbackProvider.builder()
                 .toolObjects(fileOperationTools).build();
         fileToolCallbacks = fileProvider.getToolCallbacks();
-        log.info("内置工具初始化完成，文件操作: {}", fileToolCallbacks.length);
+        MethodToolCallbackProvider mathProvider = MethodToolCallbackProvider.builder()
+                .toolObjects(mathTools).build();
+        mathToolCallbacks = mathProvider.getToolCallbacks();
+        log.info("内置工具初始化完成，文件操作: {}, 数学计算: {}", fileToolCallbacks.length, mathToolCallbacks.length);
     }
 
     public ToolCallback[] getAllTools() {
@@ -44,6 +52,7 @@ public class McpToolManager {
         List<ToolCallback> all = new ArrayList<>();
         // 1、function call
         all.addAll(Arrays.asList(fileToolCallbacks));
+        all.addAll(Arrays.asList(mathToolCallbacks));
         // 2、MCP 工具
         all.addAll(registry.getAllToolCallbacks());
         // 3、skill
